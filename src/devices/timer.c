@@ -146,23 +146,6 @@ timer_sleep (int64_t ticks)
 void
 timer_wakeup(void)
 {
-
-  #if 0
-  struct list_elem *e;
-  for (e = list_begin(&sleep_list); e != list_end(&sleep_list) ; e = list_next(e))
-  {
-    struct thread *th = list_entry(e, struct thread, elem);
-    if(th->wakeup_time <= ticks)
-    {
-      struct list_elem *temp = list_pop_front(&sleep_list);
-      thread_unblock(th);
-    }
-    else
-    {
-      break;
-    }
-  }
-  #else
   struct thread *th;
   while(!list_empty(&sleep_list))
   {
@@ -178,7 +161,6 @@ timer_wakeup(void)
       break;
     }
   }
-  #endif
 }
 
 
