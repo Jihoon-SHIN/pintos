@@ -71,6 +71,41 @@ static void schedule (void);
 void schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
+/* less_func */
+bool compare_priority(struct list_elem *a, struct list_elem *b, void *aux);
+
+bool
+compare_priority(struct list_elem *a, struct list_elem *b, void *aux)
+{
+  struct thread *th_a = list_entry(a, struct thread, elem);
+  struct thread *th_b = list_entry(b, struct thread, elem);
+
+  int priority_a = th_a->priority;
+  int priority_b = th_b->priority;
+
+  if(priority_a > priority_b)
+  {
+    return true;
+  }
+  else if(priority_a < priority_b)
+  {
+    return false;
+  }
+  else
+  {
+    if(th_a->wakeup_time <th_b->wakeup_time)
+    {
+      return true;
+    }
+    else
+    {
+      return false;
+    }
+  }
+
+}
+
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -199,6 +234,11 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+  if(thread_current()->priority < priority)
+  {
+    thread_yield();
+  }
+
   return tid;
 }
 
@@ -235,7 +275,9 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+
+  // list_push_back (&ready_list, &t->elem);
+  list_insert_ordered(&ready_list, &t->elem, compare_priority, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -303,8 +345,11 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (curr != idle_thread) 
-    list_push_back (&ready_list, &curr->elem);
+  if (curr != idle_thread)
+  {
+    // list_push_back (&ready_list, &curr->elem);
+    list_insert_ordered(&ready_list, &curr->elem, compare_priority, NULL);
+  }
   curr->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -314,7 +359,16 @@ thread_yield (void)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+  struct thread *curr = thread_current();
+  int curr_priority = curr->priority;
+
+  curr->original_priority = new_priority;
+  curr->priority = new_priority;
+
+  if(new_priority < curr_priority)
+  {
+    thread_yield();
+  }
 }
 
 /* Returns the current thread's priority. */

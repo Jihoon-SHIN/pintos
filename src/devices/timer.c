@@ -143,6 +143,8 @@ timer_sleep (int64_t ticks)
   thread_block();
   intr_set_level(old_level);
 }
+
+/* Wakeup the thread */
 void
 timer_wakeup(void)
 {
@@ -162,7 +164,6 @@ timer_wakeup(void)
     }
   }
 }
-
 
 /* Suspends execution for approximately MS milliseconds. */
 void

@@ -88,12 +88,13 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
+    int original_priority;              /* Original priority */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
     /* Store thread wakeup time */
-    int wakeup_time;
+    int64_t wakeup_time;
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
@@ -134,7 +135,5 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
-
-
 
 #endif /* threads/thread.h */
