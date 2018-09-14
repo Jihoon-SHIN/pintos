@@ -71,29 +71,19 @@ static void schedule (void);
 void schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
-/* less_func */
-bool compare_priority(struct list_elem *a, struct list_elem *b, void *aux);
-
-bool
-compare_priority(struct list_elem *a, struct list_elem *b, void *aux)
+static bool
+less_priority(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED)
 {
-  struct thread *th_a = list_entry(a, struct thread, elem);
-  struct thread *th_b = list_entry(b, struct thread, elem);
+  const struct thread* th_a = list_entry(a, struct thread, elem);
+  const struct thread* th_b = list_entry(b, struct thread, elem);
 
-  int priority_a = th_a->priority;
-  int priority_b = th_b->priority;
-
-  if(priority_a > priority_b)
+  if(th_a->priority > th_b->priority)
   {
     return true;
   }
-  else if(priority_a < priority_b)
+  else if(th_a->priority == th_b->priority)
   {
-    return false;
-  }
-  else
-  {
-    if(th_a->wakeup_time <th_b->wakeup_time)
+    if(th_a->wakeup_time< th_b->wakeup_time)
     {
       return true;
     }
@@ -102,7 +92,10 @@ compare_priority(struct list_elem *a, struct list_elem *b, void *aux)
       return false;
     }
   }
-
+  else
+  {
+    return false;
+  }
 }
 
 
@@ -275,9 +268,8 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-
   // list_push_back (&ready_list, &t->elem);
-  list_insert_ordered(&ready_list, &t->elem, compare_priority, NULL);
+  list_insert_ordered(&ready_list, &t->elem, less_priority, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -348,8 +340,9 @@ thread_yield (void)
   if (curr != idle_thread)
   {
     // list_push_back (&ready_list, &curr->elem);
-    list_insert_ordered(&ready_list, &curr->elem, compare_priority, NULL);
-  }
+    list_insert_ordered(&ready_list, &curr->elem, less_priority, NULL);
+  } 
+    
   curr->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -493,6 +486,7 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->original_priority = priority;
   t->magic = THREAD_MAGIC;
 }
 
