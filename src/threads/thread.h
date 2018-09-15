@@ -88,11 +88,16 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
-
-    int original_priority;
+    int original_priority;              /* Original Prioirty before donated */
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
     int64_t wakeup_time;
+
+    int donate_count;                   /* Counting the donation count */
+    struct lock *try_lock;              /* Try to acquire lock */
+
+    struct list lock_list;              /* List of lock */
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */

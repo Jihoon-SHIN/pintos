@@ -57,7 +57,7 @@ static void
 acquire2_thread_func (void *lock_) 
 {
   struct lock *lock = lock_;
-
+  
   lock_acquire (lock);
   msg ("acquire2: got the lock");
   lock_release (lock);
