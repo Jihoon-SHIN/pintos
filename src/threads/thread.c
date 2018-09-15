@@ -356,11 +356,13 @@ thread_set_priority (int new_priority)
   int curr_priority = curr->priority;
 
   curr->original_priority = new_priority;
-  curr->priority = new_priority;
-
-  if(new_priority < curr_priority)
+  if(curr->donate_count == 0)
   {
-    thread_yield();
+    curr->priority = new_priority;
+    if(new_priority < curr_priority)
+    {
+      thread_yield();
+    }
   }
 }
 
