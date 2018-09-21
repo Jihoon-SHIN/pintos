@@ -1,0 +1,227 @@
+			+--------------------+
+			|       CS 330       |
+			| PROJECT 1: THREADS |
+			|   DESIGN DOCUMENT  |
+			+--------------------+
+				   
+---- GROUP ----
+
+>> Fill in the names and email addresses of your group members.
+
+신지훈 <jihoon9030@kaist.ac.kr>
+김태연 <ktyty7@kaist.ac.kr>
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for the
+>> TAs, usage of tokens, or extra credit, please give them here.
+
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation, course
+>> text, lecture notes, and course staff.
+
+			     ALARM CLOCK
+			     ===========
+
+---- DATA STRUCTURES ----
+
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+1. threads/thread.c
+struct thread
+{
+	...
+	int64_t wakeup_time;
+	...
+}
+-> thread가 sleep하고 나서 깨울 시간을 기록하는 variable이다. 나중에 ticks보다 이 시간이 작으면 sleep_list에 있는 thread를 깨운다.
+
+2. devices/timer.c
+static struct list sleep_list;
+-> sleep하고 있는 list들을 저장하는 sleep_list이다. timer_sleep에서 thead_current()를 재우고 저장할 때 쓰인다.
+
+static bool compare_wake(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED);
+-> list_insert_ordered에 쓰이는 list_less_func 이다. a와 b를 list_entry를 통해 thread로 convert하고 thread_a의 wakeup_time이 더 작으면 true를 return한다.
+
+
+void timer_wakeup(void);
+-> sleep_list에서 ticks보다 작아진 thread를 깨우는 것을 도와주는 함수. timer_interrupt 함수에서 지속적으로 불리어 thread들을 깨운다.
+
+
+
+---- ALGORITHMS ----
+
+>> A2: Briefly describe what happens in a call to timer_sleep(),
+>> including the effects of the timer interrupt handler.
+
+timer_sleep 이 실행되면 current thread에 wakeup_time을 저장하기 전에, interrupt를 disable 한 후, wakeup_time을 저장한다. 그 후, wakeup_time이 작은 순서대로 sleep_list에 넣는다. 나중에 thread를 깨울 때, sleep_list의 앞에서 부터 깨우면 wakeup_time이 작은 것부터 깨울 수 있기 때문이다. 그 후, sleep이므로 thread를 block하기 위해 thread_block()을 하고, 다시 interrupt를 able하게 한다.
+
+이렇게 sleep_list에 넣고, thread를 block하면 우리는 깨우고 unblock 해야할 것이다. 그러기 위해서 timer_wakeup이라는 함수를 선언한다. 이 함수에서는 sleep_list의 원소들을 앞에서 부터 보면서 ticks보다 작은 wakeup_time을 가진 thread들을 unblock하고 sleep_list에서 pop해준다. 즉, unblock하고 깨운다는 소리이다. 이 timer_wakeup은 timer_interrupt 함수 안에 선언한다. timer_interrupt는 일정 시간이 지날 때마다 호출되는 함수 이므로 우린 thread를 안정적으로 unblock 할 수 있게 된다.
+
+>> A3: What steps are taken to minimize the amount of time spent in
+>> the timer interrupt handler?
+
+처음 implementation은 busy waiting 으로 구현되어 있었다. timer_sleep에서 ticks보다 작아질 때까지 while문을 기다렸다가 yield한다. 그 방법을 개선하기 위해 sleep_list를 만들고 timer_interrupt가 불릴 때 ticks보다 작아진 thread만 확인하여 wakeup, unblock하므로 시간을 최소화할 수 있었다.
+
+
+---- SYNCHRONIZATION ----
+
+>> A4: How are race conditions avoided when multiple threads call
+>> timer_sleep() simultaneously?
+
+timer_sleep에서 interrupt를 disable한다. interrupt를 할 수 없게 하면 다른 thread가 동시에 timer_sleep을 호출할 수 없다. interrupt를 disable 하는 코드는 다음과 같다. enum intr_level old_level = intr_disable(); 그 후, 작업이 끝난 후에 intr_set_level(old_level); 이 코드로 interrupt를 on해준다.
+
+>> A5: How are race conditions avoided when a timer interrupt occurs
+>> during a call to timer_sleep()?
+
+timer interrupt도 마찬가지로 timer_sleep을 실행할 때 interrupt를 할 수 없게 disable하므로 race conditions 을 방지할 수 있다.
+
+---- RATIONALE ----
+
+>> A6: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+
+우선적으로, 기존의 busy waiting 방법에 비해 효율적인 방법이다. 그리고 list_insert_ordered 를 통해 sleep_list에 넣을 때 wakeup_time이 작은 순서대로 정렬하는 방법을 택했는데, 이는 wakeup_time에 관계 없이 list에 넣은 후 추후에 sort하는 것보다 빠른 방법이다. 또한 이렇게 정렬된 list를 바탕으로, 가장 앞 원소를 확인하여 아직 wakeup할 충분한 시간이 지나지 않았을 경우,  timer_wakeup의 while문에서의 break를 통하여 의미 없이 while문을 돌지 않도록 하였다.
+
+
+			 PRIORITY SCHEDULING
+			 ===================
+
+---- DATA STRUCTURES ----
+
+>> B1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+1.threads/thread.h
+struct thread
+{
+	…
+	int original_priority;                /* Original Prioirty before donated */
+	int donate_count;                   /* Counting the donation count */
+	struct lock *try_lock;              /* Try to acquire lock */
+	struct list lock_list;                /* List of lock */
+	...
+}
+- original_priority는 thread가 create될 때 부여받은 태초의 priority 이다.
+- donate_count는 thread가 다른 thread로 부터 donation을 받은 횟수를 저장한다.
+- try_lock은 lock_acquire를 할 때, current thread가 acquire하려는 lock을 저장한다.
+- lock_list는 thread가 hold하고 있는 lock들을 저장하는 list 이다.
+
+
+2. threads/synch.h
+struct lock
+{
+	…
+	struct list_elem elem;
+}
+- lock을 list에 저장하기 위해서 lock구조체 안에 list_elem을 집어넣었다.
+
+3. threads/synch.c
+bool compare_priority(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED);
+static bool highPriority_lock(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED);
+static bool highPriority_cond(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED);
+
+- 세 함수 모두 list_less_func 으로 list_insert_ordered를 하기 위해 사용된다.
+
+4. threads/threads.c
+static bool less_priority(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED);
+
+- list_less_func 으로 ready_list에 list_insert_ordered를 하기 위해서 사용된다.
+
+
+
+>> B2: Explain the data structure used to track priority donation.
+>> Use ASCII art to diagram a nested donation.  (Alternately, submit a
+>> .png file.)
+
+thread 구조체 안에, try_lock과 lock_list를 선언했다. 우선 lock_list부터 설명하면, lock_list는 thread가 hold하고 있는, sema_down을 한 lock들을 저장하는 list이다. 이 list가 필요한 예시는 priority-donate-multiple2 의 경우이다. priority-donate-multiple2는 priority31 thread가 lock a와 lock b를 acquire한 후에, priority 34인 thread가 lock a를 acquire하려고 기다린다. 그리고 priority 32인 thread가 lock 필요없이 생성되고, prioirty 36인 thread가 lock b를 acquire하려고 기다리면서 생성된다. 이 상황에서 lock a가 먼저 release된다. 만약 lock_list가 없는 상황을 먼저 가정해보자. prioiry 31 짜리는 36을 donation 받았을 것이고 다시 priority가 돌아가야한다. 그러면 31로 돌아가게 될 것 이고 lock 이 필요없는 thread 32짜리에게 cpu가 yield될 것이다. 이를 방지하기 위해 lock_list를 만든다. lock_list를 만들면 lock a 가 release 되기 전에 lock_list 안에는 lock a 와 lock b가 있다. lock a 가 release되면 lock list에서 lock a 를 없앤다. 그 후 lock list에 있는 lock 중 가장 큰 priority를 donation 해준다. 이 경우에서는 36을 도네이션 받으면서, lock이 없는 thread 32 에게 yield하지 않고 정상적인 순서대로 thread가 실행할 수 있게 된다.
+
+
+
+
++----------+       +----------+       +----------+
+|  thread  |       |  thread  |       |  thread  |
+|    31    |       |    32    |       |    33    |
++----------+    _/ +----------+    _/ +----------+
+     ||       _/        ||       _/
+ +========+  /      +========+  /
+ | Lock a | ▶       | Lock b | ▶
+ +========+         +========+
+
+           <Diagram of a nested donation>
+priority-nested-donation의 diagram이다. priroity 31 thread가 먼저 lock a를 acquire하고, priority 32 thread가 lock b 를 acquire한 후 lock a 를 acquire하려 한다. 그리고 priority 33인 thread가 lock b를 acquire한다. 이 경우, priority 33 thread의 priority가 thread 31에게 까지 donaton을 해야한다. 이를 위해 try_lock 라는 변수를 thread 구조체에 새로 선언하고 사용한다. 자세한 방법은 B4에서 설명한다.
+ 
+
+---- ALGORITHMS ----
+
+>> B3: How do you ensure that the highest priority thread waiting for
+>> a lock, semaphore, or condition variable wakes up first?
+
+semaphore의 waiters, thread의 lock_list, condition variable의 waiters에 element들을 저장할 때, list_insert_ordered를 통해 the highest priority를 가진 thread, 또는 그러한 thread의 lock을 list의 제일 앞으로 오도록 저장한다. 이후에 list_pop_front, 혹은 list_front를 통하여 the highest priority thread를 제일 먼저 깨울 수 있다.
+
+>> B4: Describe the sequence of events when a call to lock_acquire()
+>> causes a priority donation.  How is nested donation handled?
+
+lock_acquire()가 실행되면 thread_current()->try_lock = lock; , current thread 에 try_lock변수에 lock을 저장한다. 이것은 nested donation을 처리하기 위한 것으로 나중에 설명하겠다. 그 후 priority_donation(lock)이 실행된다. 이것은 lock->holder thread가 priority를 donation 받는 것이다. 이 donation이 끝나면 sema_down(&lock->semaphore) 를 하는데, sema->value가 1이 될 때 까지, 즉 sema_up이 될 때까지 대기하며, sema의 waiters 에 thread_current를 저장하고 그 thread를 block 해둔다. sema value가 1이 되어 sema_down이 끝나면 lock->holder는 thread_current가 되고, current thread(lock->holder) 에 lock_list에 lock을 넣는다. lock holder의 priority 가 높은 순서대로 넣는다. 그리고 thread_current에 try_lock을 NULL로 바꾼다.
+
+lock_list의 용도는 위에 B2에서 다 설명했다. 이제 try_lock에 대해서 설명해보도록 하자. try_lock은 말 그대로 thread_current()가 acquire를 시도하려는 lock이다. 이는 nested donation에서 필수적으로 필요하다. priority-donation-nested test case를 예로 들어보면, 이 케이스는 priority 31인 thread가 lock a를 acquire하고, priority 32 thread가 lock b를 acquire한 후 lock a를 acquire하려고 한다. 그리고 priority 33 thread가 lock b를 acquire하려고 한다. priority 33 thread가 lock b를 acquire를 하려고 코드가 실행되면 자신의 priority를 32의 thread에게 donation한다. 그러면 priority 32짜리는 33이 되는데, 이 때 31짜리(donation을 받아서 32)에게도 33을 donation을 해야한다. 그래야 priority 의 순서대로 lock을 acquire할 수 있게 된다. 이 때 try_lock이 사용된다.
+priority 33  thread가 lock_acquire을 하면 33의 try_lock은 b가 되고, 이 b의 lock->holder는 현재 32짜리이다. lock_donation 함수 안에서 lock->holder의 try_lock에 대해서 재귀적으로 lock_donation이 한번 더 일어나게 된다. lock->holder는 32짜리이고 이 32의 try_lock은 lock a이므로 lock a 의 lock->holder인 31짜리에게 까지 donation이 차례대로 이루어지게 된다. 이 donation이 끝난 후에 try_lock은 NULL로 만들어야 예기치 못한 donation을 막을 수 있다.
+
+
+>> B5: Describe the sequence of events when lock_release() is called
+>> on a lock that a higher-priority thread is waiting for.
+
+lock_realse가 call되면 우선 lock의 elem 리스트를 제거한다. 제거하는 이유는 해당 lock에 있는 thread의 priority와는 더 이상 연관있지 않기 때문이다. 이후 해당 lock에 대해 priority_back을 call한다. priority_back에서는 current thread의 donate_count가 0보다 크고, lock의 thread와 현재의 thread의 priority가 같을 경우(즉, donate가 이루어진 상황일 경우), 원래의 priority를 되찾는 일을 한다. current thread의 donate_count가 1인 경우는 간단하게 original_priority에서 기존의 priority를 되찾을 수 있다. 그렇지 않은 경우(donate_count>=2), current thread의 lock_list가 비어있는지를 확인하여 비어있는 경우(lock이 이미 다 풀린 경우)에는 원래의 priority로 돌아가야 하므로 미리 저장해 두었던 original_priority를 이용하면 간단히 해결 가능하다. 비어있지 않다면 해당 lock_list의 제일 앞 lock의 semaphore의 waiters list의 가장 앞에 해당하는 thread의 priority가 priority가 된다. priority_back이 완료되면, lock의 holder를 NULL로 하고 lock의 semaphore를 sema_up한다.
+
+
+---- SYNCHRONIZATION ----
+
+>> B6: Describe a potential race in thread_set_priority() and explain
+>> how your implementation avoids it.  Can you use a lock to avoid
+>> this race?
+
+thread_set_priority()를 통해 priority 가 달라져서 thread_yield()를 호출해야하는 상황이 있지만 그렇지 않아야하는 상황도 있다. 예를 들어, priority 31 thread 가 lock a 를 hold 하고 priority 33 짜리가 lock a 를 acquire 한다. 그리고 priority 32 가 lock 이 필요없이 create 됐다고 가정하자. 원래의 순서로는 31->33->32 순서일 것이다. 만약 thread_set_priority()가 제대로 작동하지 않아서 31 이 33을 donation받은 것을 31로 바꿔버리면 바로 32 짜리에게 cpu를 yield하게 된다. 우리는 이 경우를 방지하기 위해서 thread 구조체에 선언해둔 donate count를 이용했다. donate count가 0일 때만 thread_current()->priority와 original_priority 를 변경하고 새로운 priority가 현재 priority보다 높으면 thread_yield()를 호출했다. donate_count가 0이 아니면 original_priority 만 변경해준다. 이렇게 하면 thread_set_priority() 가 실행되어도 race condition이 발생되는 것을 막을 수 있다.
+
+결과적으로 우리는 lock을 사용하지 않고 해결했다.
+
+
+
+
+---- RATIONALE ----
+
+>> B7: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+
+- try_lock을 이용해서 nested donation을 비교적 간단하게 해결할 수 있었다.
+- list_insert 시 list_insert_ordered와 priority를 비교하는 함수들을 이용하여 이후에 높은 priority부터 실행할 때 걸리는 시간을 단축할 수 있었다.
+- donate_count 라는 변수를 thread 구조체에 선언하여 아주 유용하게 사용할 수 있었다. priority를 원래의 priority나 실행 순서에 맞는 순서로 실행시키기 위해 priority를 변경해줄 때, 다른 방법을 사용했다면 어려울 수 있었을 텐데, donate_count 변수로 비교적 쉽게 경우를 나눌 수 있었다. 또한 thread_set_priority에서도 race condition이 발생할 수 있었지만 donate_count 변수로 lock을 사용하지 않고 비교적 쉽게 문제를 해결할 수 있었다.
+- original_priority 라는 변수를 thread 구조체에 선언하여 donate 이후 priority를 다시 돌려받을 때 간단히 처리할 수 있도록 하였다.
+- lock을 list에 저장한 lock_list를 이용해서 여러 개의 thread들이 lock을 acquire하려는 상황을 쉽게 해결했다.
+
+			   SURVEY QUESTIONS
+			   ================
+
+Answering these questions is optional, but it will help us improve the
+course in future quarters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the quarter.
+
+>> In your opinion, was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+
+>> Is there some particular fact or hint we should give students in
+>> future quarters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future quarters or the remaining projects?
+
+>> Any other comments?
+

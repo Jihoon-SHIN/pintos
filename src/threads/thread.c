@@ -71,6 +71,10 @@ static void schedule (void);
 void schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
+static bool less_priority(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED);
+
+
+/* less func ready list ordered */
 static bool
 less_priority(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED)
 {
@@ -227,6 +231,8 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+  /* If thread's priority higher than current priority
+        yield the CPU */
   if(thread_current()->priority < priority)
   {
     thread_yield();

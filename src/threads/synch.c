@@ -36,7 +36,7 @@ bool compare_priority(const struct list_elem* a, const struct list_elem* b, void
 static bool highPriority_lock(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED);
 static bool highPriority_cond(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED);
 
-
+/* less func */
 bool
 compare_priority(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED)
 {
@@ -138,7 +138,6 @@ sema_up (struct semaphore *sema)
     if(a->priority > thread_current()->priority)
     {
       check_yield = 1;
-      // thread_yield();
     }
   }
   sema->value++;
@@ -386,7 +385,10 @@ cond_broadcast (struct condition *cond, struct lock *lock)
     cond_signal (cond, lock);
 }
 
+/* This is my own code */
 
+/* The function that help donation. 
+    lock_th->try_lock solve the nested donation problem */
 void
 priority_donation(struct lock *lock)
 {
@@ -407,6 +409,7 @@ priority_donation(struct lock *lock)
   }
 }
 
+/* The function that help to find proper priority. */
 void
 priority_back(struct lock *lock)
 {
@@ -444,6 +447,7 @@ priority_back(struct lock *lock)
 }
 
 
+/* less func */
 static bool
 highPriority_lock(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED)
 {
@@ -471,7 +475,7 @@ highPriority_lock(const struct list_elem* a, const struct list_elem* b, void* au
   }
 }
 
-
+/* less func */
 static bool
 highPriority_cond(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED)
 {

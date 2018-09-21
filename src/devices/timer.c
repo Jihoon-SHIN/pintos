@@ -32,7 +32,7 @@ static void real_time_sleep (int64_t num, int32_t denom);
 /* This is my code */
 static bool compare_wake(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED);
 static struct list sleep_list;
-
+void timer_wakeup(void);
 
 static bool
 compare_wake(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED)

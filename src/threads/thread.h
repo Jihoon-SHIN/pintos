@@ -92,12 +92,9 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
     int64_t wakeup_time;
-
     int donate_count;                   /* Counting the donation count */
     struct lock *try_lock;              /* Try to acquire lock */
-
     struct list lock_list;              /* List of lock */
-
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
@@ -139,5 +136,4 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
-void timer_wakeup(void);
 #endif /* threads/thread.h */
