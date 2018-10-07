@@ -152,7 +152,6 @@ sema_up (struct semaphore *sema)
       {
         intr_yield_on_return();
       }
-      // thread_yield();
   }
 }
 

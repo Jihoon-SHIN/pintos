@@ -20,6 +20,7 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+void argument_passing(void **esp, char *argument_line);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -29,19 +30,28 @@ tid_t
 process_execute (const char *file_name) 
 {
   char *fn_copy;
+  char *fn_copy2;
+  char *save_ptr;
   tid_t tid;
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
-  if (fn_copy == NULL)
+  fn_copy2 = palloc_get_page(0);
+  if (fn_copy == NULL || fn_copy2 ==NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
+  strlcpy (fn_copy, file_name, PGSIZE);
 
+  fn_copy2 = strtok_r(fn_copy2, " ", &save_ptr);
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (fn_copy2, PRI_DEFAULT, start_process, fn_copy);
+
+  palloc_free_page(fn_copy2);
   if (tid == TID_ERROR)
+  {
     palloc_free_page (fn_copy); 
+  }
   return tid;
 }
 
@@ -88,7 +98,11 @@ start_process (void *f_name)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  return -1;
+  // return -1;
+  while(true)
+  {
+    thread_yield();
+  }
 }
 
 /* Free the current process's resources. */
@@ -195,7 +209,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp);
+static bool setup_stack (void **esp, char *argument_line);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -215,6 +229,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
   bool success = false;
   int i;
 
+  char *fn_copy;
+  char *save_ptr;
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
   if (t->pagedir == NULL) 
@@ -222,7 +238,12 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
-  file = filesys_open (file_name);
+  fn_copy = malloc(strlen(file_name)+1);
+  strlcpy(fn_copy, file_name, strlen(file_name)+1);
+  fn_copy = strtok_r(fn_copy, " ", &save_ptr);
+  file = filesys_open (fn_copy);
+
+  free(fn_copy);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
@@ -302,7 +323,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp))
+  if (!setup_stack (esp, file_name))
     goto done;
 
   /* Start address. */
@@ -427,22 +448,106 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp) 
+setup_stack (void **esp, char *argument_line) 
 {
   uint8_t *kpage;
   bool success = false;
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
-    {
+  {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
         *esp = PHYS_BASE;
       else
         palloc_free_page (kpage);
-    }
+  }
+  argument_passing(esp, argument_line);
+  hex_dump(0xbfffffb4, 0xbfffffb4, sizeof(char) * 100, true);
   return success;
 }
+
+
+void
+argument_passing(void **esp, char *argument_line)
+{
+  bool success = false;
+  int argc = 0;
+  int initial_size = 2;
+  char **argv, *save_ptr, *token;
+
+  /* Initializing the argv */
+  argv = (char **) malloc(sizeof(char *) * initial_size);
+
+  /* Iterating of argument using strtok, store token in argv */
+  for(token=strtok_r(argument_line, " ", &save_ptr); token != NULL; token=strtok_r(NULL, " ", &save_ptr))
+  {
+    argc++;
+    if(argc != 1)
+    {
+      argv = (char **)realloc(sizeof(char *)*argc);
+    }
+    argv[argc-1] = (char *)malloc(sizeof(char)*strlen(token)+1);
+    strlcpy(argv[argc-1], token, strlen(token)+1);
+  }
+
+  /* As calling convention, argv[argc]=0 */
+  argv[argc] = 0;
+  int i;
+  int argv_addr[argc];
+
+  /* Push the argv[i] is char*, store the address of argv[i] in the argv_addr[i] */
+  for(i=argc-1; i >= 0 ; i--)
+  {
+    *esp -= strlen(argv[i])+1;
+    memcpy(*esp, argv[i], strlen(argv[i])+1);
+    argv_addr[i] = *esp;
+    free(argv[i]);
+  }
+
+  /* Aligning the word, if need */
+  int word_align = (size_t)*esp % 4;
+  if(word_align)
+  {
+    *esp -= word_align;
+    memset(*esp, 0, word_align);
+  }
+
+  /* Push the address of argv[i].
+     If i==agrc, push the value of argv[argc] */
+
+  for(i=argc; i>=0; i--)
+  {
+    *esp -= sizeof(char *);
+    if(i==argc)
+    {
+      memcpy(*esp, &argv[argc], sizeof(char *));
+      printf("Hello welcome %d\n", &argv[argc]);
+    }
+    else
+    {
+      *((int *)*esp) = argv_addr[i];
+    }
+  }
+
+  /* Push the address of argv[0] */
+  token = *esp;
+  *esp -= sizeof(char **);
+  memcpy(*esp, &token, sizeof(char **));
+
+  /* Push the value of argc */
+  *esp -= sizeof(int);
+  memcpy(*esp, &argc, sizeof(int));
+
+  /* Push the Null pointer as return address */
+  int value_zero = 0;
+  *esp -= sizeof(void *);
+  memcpy(*esp, &value_zero, sizeof(void *));
+
+  free(argv);
+}
+
+
 
 /* Adds a mapping from user virtual address UPAGE to kernel
    virtual address KPAGE to the page table.
