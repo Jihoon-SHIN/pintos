@@ -91,7 +91,7 @@ struct thread
     int original_priority;              /* Original Prioirty before donated */
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-    int64_t wakeup_time;
+    int64_t wakeup_time;                /* wakeup time of thread */
     int donate_count;                   /* Counting the donation count */
     struct lock *try_lock;              /* Try to acquire lock */
     struct list lock_list;              /* List of lock */

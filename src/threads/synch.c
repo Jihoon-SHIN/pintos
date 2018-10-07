@@ -144,15 +144,15 @@ sema_up (struct semaphore *sema)
   intr_set_level (old_level);
 
   if(check_yield){
-      // if(!intr_context())
-      // {
-      //   thread_yield();  
-      // }
-      // else
-      // {
-      //   intr_yield_on_return();
-      // }
-      thread_yield();
+      if(!intr_context())
+      {
+        thread_yield();  
+      }
+      else
+      {
+        intr_yield_on_return();
+      }
+      // thread_yield();
   }
 }
 
@@ -409,7 +409,8 @@ priority_donation(struct lock *lock)
   }
 }
 
-/* The function that help to find proper priority. */
+/* The function that help to find proper priority. 
+    Priority back  */
 void
 priority_back(struct lock *lock)
 {
