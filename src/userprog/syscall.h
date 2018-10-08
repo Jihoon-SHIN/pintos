@@ -1,6 +1,13 @@
 #ifndef USERPROG_SYSCALL_H
 #define USERPROG_SYSCALL_H
 
+#include "threads/synch.h"
+
+
 void syscall_init (void);
+
+
+struct lock filesys_lock;	/* filesys lock. filesys can execute one by one */
+
 
 #endif /* userprog/syscall.h */
