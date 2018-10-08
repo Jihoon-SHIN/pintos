@@ -570,3 +570,25 @@ install_page (void *upage, void *kpage, bool writable)
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }
+
+
+/* This is own code */
+
+/* Project2 USERPROG */
+struct file_element *
+find_file(int fd)
+{
+  if(fd<2 || fd>= thread_current()->fd)
+  {
+    exit(-1);
+  }
+  struct thread *cur = thread_current();
+  struct list_elem *e;
+  for(e=list_begin(&cur->file_list); e != list_end(&cur->file_list); e= list_next(e))
+  {
+    struct file_element *fe = list_entry(e, struct file_element, elem);
+    if(fe->fd == fd)
+      return fe;
+  }
+  return NULL;
+}

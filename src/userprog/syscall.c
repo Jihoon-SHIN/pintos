@@ -4,7 +4,7 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
-
+#include "userprog/process.h"
 
 static void syscall_handler (struct intr_frame *);
 void exit(int status);
@@ -14,6 +14,7 @@ void
 syscall_init (void) 
 {
 	lock_init(&filesys_lock);
+	lock_init(&exec_exit_lock);
 	intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -72,15 +73,20 @@ void halt(void)
 
 void exit(int status)
 {
+	if(!lock_held_by_current_thread(&exec_exit_lock))
+		lock_acquire(&exec_exit_lock);
 	struct thread *cur_thread = thread_current();
 	printf ("%s: exit(%d)\n", cur_thread->name, status);
+	lock_release(&exec_exit_lock);
 	thread_exit();
 }
 
 int exec(const char *cmd_line)
 {	
-	process_execute(cmd_line);
-	return 0;
+	lock_acquire(&exec_exit_lock);
+	int pid_p = process_execute(cmd_line);
+	lock_release(&exec_exit_lock);
+	return pid_p;
 }
 
 int wait(int pid)
@@ -107,21 +113,34 @@ int
 open(const char *file)
 {
 	if(file == NULL)
-	{
-		
-	}
+		return -1;
+	
 	lock_acquire(&filesys_lock);
+	struct file* f = filesys_open(file);
 	lock_release(&filesys_lock);
-	return 0;
 
+	if(f== NULL)
+		return -1;
+
+	struct file_element *fe = malloc(sizeof(struct file_element));
+	fe->file = f;
+	fe->fd = thread_current()->fd;
+	list_push_back(&thread_current()->file_list, &fe->elem);
+	int return_value = thread_current()->fd++;
+	return return_value;
 }
 
 int
 filesize(int fd)
 {
+	struct file_element *fe = find_file(fd);
+	if(fe == NULL)
+		return -1;
+
 	lock_acquire(&filesys_lock);
+	int size = file_length(fe->file);
 	lock_release(&filesys_lock);
-	return 0;
+	return size;
 }
 
 int
@@ -131,9 +150,14 @@ read(int fd, void *buffer, unsigned size)
 	{
 		return input_getc();
 	}
+	struct file_element *fe = find_file(fd);
+	if(fe==NULL)
+		return -1;
+
 	lock_acquire(&filesys_lock);
+	int result = file_read(fe->file, buffer, size);
 	lock_release(&filesys_lock);
-	return 1;
+	return result;
 }
 
 int
@@ -144,23 +168,35 @@ write(int fd, void *buffer, unsigned size)
 		putbuf(buffer, size);
 		return size;
 	}
+	struct file_element *fe = find_file(fd);
+	if(fe==NULL)
+		return -1;
 	lock_acquire(&filesys_lock);
-	// int result = file_write(fd, buffer, size);
+	int result = file_write(fe->file, buffer, size);
 	lock_release(&filesys_lock);
-	return size;
+	return result;
 }
 
 void
 seek(int fd, unsigned position)
 {
+	struct file_element *fe = find_file(fd);
+	if(fe==NULL)
+		return -1;
+
 	lock_acquire(&filesys_lock);
+	file_seek(fe->file, position);
 	lock_release(&filesys_lock);
 }
 
 unsigned
 tell(int fd)
 {
+	struct file_element *fe = find_file(fd);
+	if(fe==NULL)
+		return -1;
 	lock_acquire(&filesys_lock);
+	file_tell(fe->file);
 	lock_release(&filesys_lock);
 	return (unsigned) 1;
 }
@@ -168,7 +204,11 @@ tell(int fd)
 void
 close(int fd)
 {
+	struct file_element *fe = find_file(fd);
+	if(fe==NULL)
+		return -1;
 	lock_acquire(&filesys_lock);
+	file_close(fe->file);
 	lock_release(&filesys_lock);
 }
 

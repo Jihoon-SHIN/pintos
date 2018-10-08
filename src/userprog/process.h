@@ -11,6 +11,10 @@ int process_wait (tid_t);
 void process_exit (void);
 void process_activate (void);
 
+/* This is my code */
+
+/* Project 2 USERPROG */
+struct file_element * find_file(int fd);
 
  // Child process control block 
 struct child_process
@@ -37,6 +41,7 @@ struct file_element
 
 	struct list_elem elem;
 };
+/* USERPROG2 */
 
 
 #endif /* userprog/process.h */

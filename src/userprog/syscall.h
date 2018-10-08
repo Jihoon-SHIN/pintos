@@ -8,6 +8,6 @@ void syscall_init (void);
 
 
 struct lock filesys_lock;	/* filesys lock. filesys can execute one by one */
-
+struct lock exec_exit_lock;	/* Synchronizaion of exec and exit */
 
 #endif /* userprog/syscall.h */

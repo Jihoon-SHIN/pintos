@@ -228,6 +228,24 @@ thread_create (const char *name, int priority,
   sf = alloc_frame (t, sizeof *sf);
   sf->eip = switch_entry;
 
+  #ifdef USERPROG
+  int DEFAULT_VALUE = 0;
+  struct child_process *child_p = malloc(sizeof(struct child_process));
+  child_p->pid = tid;
+  child_p->parent_pid = thread_current()->tid;
+  child_p->load = DEFAULT_VALUE;
+  child_p->exit = DEFAULT_VALUE;
+  child_p->wait = DEFAULT_VALUE;
+  child_p->status = DEFAULT_VALUE;
+  lock_init(&wait_lock);
+
+  child_p->alive = 1;
+  sema_init(&child_p->sema, 0);
+  sema_init(&child_p->sema_load, 0);
+  list_push_back( &thread_current()-> child_list, &child_p->elem );
+  #endif
+
+
   /* Add to run queue. */
   thread_unblock (t);
 
@@ -498,6 +516,13 @@ init_thread (struct thread *t, const char *name, int priority)
   t->donate_count = 0;
   list_init(&t->lock_list);
   t->try_lock = NULL;
+
+  #ifdef USERPROG
+  t->fd = 2; /* 0, 1 is STDIN, STDOUT, so 2 is default value */
+  list_init(&t->file_list);
+  #endif
+
+
   t->magic = THREAD_MAGIC;
 }
 
