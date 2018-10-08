@@ -15,7 +15,7 @@ void process_activate (void);
 
 /* Project 2 USERPROG */
 struct file_element * find_file(int fd);
-
+struct child_process * find_child_process(tid_t child_tid);
  // Child process control block 
 struct child_process
 {
@@ -29,7 +29,7 @@ struct child_process
 	int status;           	 /* child status, which is used exit status */
 
 	struct lock wait_lock;
-	struct semaphore sema;  	/* Sema for wait <-> exit */
+	struct semaphore sema_wait;  	/* Sema for wait <-> exit */
  	struct semaphore sema_load; /* Sema for exec <-> load */
  	struct list_elem elem;
 };

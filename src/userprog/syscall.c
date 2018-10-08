@@ -97,16 +97,18 @@ int wait(int pid)
 bool create(const char *file, unsigned initial_size)
 {	
 	lock_acquire(&filesys_lock);
+	bool result = filesys_create(file, initial_size);
 	lock_release(&filesys_lock);
-	return true;
+	return result;
 }
 
 bool
 remove(const char *file)
 {
 	lock_acquire(&filesys_lock);
+	bool result = filesys_remove(file);
 	lock_release(&filesys_lock);
-	return true;
+	return result;
 }
 
 int

@@ -98,11 +98,19 @@ start_process (void *f_name)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  while(true)
+  struct child_process *child_p = find_child_process(child_tid);
+  if(child_p == NULL || child_p->parent_pid != thread_current()->tid)
+    return -1;
+
+  if(child_p->alive)
   {
-    thread_yield();
+    sema_down(&child_p->sema_wait);
   }
-  return -1;
+  int status = child_p->status;
+  list_remove(&child_p->elem);
+
+  free(child_p);
+  return status;
 }
 
 /* Free the current process's resources. */
@@ -112,6 +120,20 @@ process_exit (void)
   struct thread *curr = thread_current ();
   uint32_t *pd;
 
+  struct list_elem *e;
+  struct list child_list = curr->child_list;
+  struct child_process *child_p;
+
+  // for(e=list_begin(&child_list); e!= list_end(&child_list); e= list_next(e))
+  // {
+  //   child_p = list_entry(e, struct child_process, elem);
+  //   e = list_remove(&child_p->elem)->prev;
+  //   free(child_p);
+  // }
+  if(curr->child_p != NULL)
+  {
+    sema_up(&curr->child_p->sema_wait);
+  }
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = curr->pagedir;
@@ -592,3 +614,21 @@ find_file(int fd)
   }
   return NULL;
 }
+
+struct child_process *
+find_child_process(tid_t child_tid)
+{
+  struct list child_list = thread_current()->child_list;
+  struct list_elem *e;
+  struct child_process *child_p;
+  for(e=list_begin(&child_list); e!= list_end(&child_list); e= list_next(e))
+  {
+    child_p = list_entry(e, struct child_process, elem);
+    if(child_p->pid == child_tid)
+    {
+      return child_p;
+    }
+  }
+  return NULL;
+}
+

@@ -237,12 +237,13 @@ thread_create (const char *name, int priority,
   child_p->exit = DEFAULT_VALUE;
   child_p->wait = DEFAULT_VALUE;
   child_p->status = DEFAULT_VALUE;
-  lock_init(&wait_lock);
 
   child_p->alive = 1;
-  sema_init(&child_p->sema, 0);
+  sema_init(&child_p->sema_wait, 0);
   sema_init(&child_p->sema_load, 0);
-  list_push_back( &thread_current()-> child_list, &child_p->elem );
+  list_push_back(&thread_current()-> child_list, &child_p->elem);
+
+  t->child_p = child_p;
   #endif
 
 
@@ -520,6 +521,7 @@ init_thread (struct thread *t, const char *name, int priority)
   #ifdef USERPROG
   t->fd = 2; /* 0, 1 is STDIN, STDOUT, so 2 is default value */
   list_init(&t->file_list);
+  list_init(&t->child_list);
   #endif
 
 
