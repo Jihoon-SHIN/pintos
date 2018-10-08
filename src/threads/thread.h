@@ -4,7 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-
+#include "filesys/file.h"
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -95,6 +95,8 @@ struct thread
     int donate_count;                   /* Counting the donation count */
     struct lock *try_lock;              /* Try to acquire lock */
     struct list lock_list;              /* List of lock */
+
+    struct list_elem allelem;          /* To store all thread */
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
@@ -102,6 +104,7 @@ struct thread
     struct list file_list;
     struct list child_list;
     struct child_process *child_p;
+    struct file *file;
 #endif
 
     /* Owned by thread.c. */
@@ -140,4 +143,6 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
+
+bool find_parent_thread(int parent_pid);
 #endif /* threads/thread.h */

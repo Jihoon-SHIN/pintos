@@ -28,6 +28,9 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
+/* List of all process in thread */
+static struct list all_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -124,6 +127,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
 
+  list_init (&all_list);
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
@@ -245,18 +249,14 @@ thread_create (const char *name, int priority,
 
   t->child_p = child_p;
   #endif
-
-
   /* Add to run queue. */
   thread_unblock (t);
-
   /* If thread's priority higher than current priority
         yield the CPU */
   if(thread_current()->priority < priority)
   {
     thread_yield();
   }
-
   return tid;
 }
 
@@ -518,12 +518,16 @@ init_thread (struct thread *t, const char *name, int priority)
   list_init(&t->lock_list);
   t->try_lock = NULL;
 
+  list_push_back(&all_list, &t->allelem);
+
   #ifdef USERPROG
   t->fd = 2; /* 0, 1 is STDIN, STDOUT, so 2 is default value */
+  t->file = NULL;
+
   list_init(&t->file_list);
   list_init(&t->child_list);
+  t->child_p = NULL;
   #endif
-
 
   t->magic = THREAD_MAGIC;
 }
@@ -637,6 +641,21 @@ allocate_tid (void)
 
   return tid;
 }
+/* Find the thread that has parent_pid in the all_list */
+bool find_parent_thread(int parent_pid)
+{
+  struct list_elem *e;
+  struct thread *th;
+  for(e=list_begin(&all_list); e!= list_end(&all_list) ; e = list_next(e))
+  {
+    th = list_entry(e, struct thread, allelem);
+    if(th->tid == parent_pid)
+      return true;
+  }
+  return false;
+}
+
+
 
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */

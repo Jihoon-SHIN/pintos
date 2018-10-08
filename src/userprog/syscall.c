@@ -34,7 +34,6 @@ get_user (const uint8_t *uaddr)
   return result;
 }
 
-
 static int
 get_arg(const uint8_t *uaddr)
 {
@@ -75,7 +74,12 @@ void exit(int status)
 {
 	if(!lock_held_by_current_thread(&exec_exit_lock))
 		lock_acquire(&exec_exit_lock);
+
 	struct thread *cur_thread = thread_current();
+	if(find_parent_thread(cur_thread->child_p->parent_pid))
+  	{
+  	 	cur_thread->child_p->status = status;
+  	}
 	printf ("%s: exit(%d)\n", cur_thread->name, status);
 	lock_release(&exec_exit_lock);
 	thread_exit();
@@ -85,6 +89,16 @@ int exec(const char *cmd_line)
 {	
 	lock_acquire(&exec_exit_lock);
 	int pid_p = process_execute(cmd_line);
+	struct child_process *child_p = find_child_process(pid_p);
+	while(child_p->load==0)
+	{
+		sema_down(&child_p->sema_load);
+	}
+	if(child_p->load == 1)
+	{
+		lock_release(&exec_exit_lock);
+		return -1;
+	}
 	lock_release(&exec_exit_lock);
 	return pid_p;
 }
@@ -96,6 +110,10 @@ int wait(int pid)
 
 bool create(const char *file, unsigned initial_size)
 {	
+	if(file==NULL)
+	{
+		exit(-1);
+	}
 	lock_acquire(&filesys_lock);
 	bool result = filesys_create(file, initial_size);
 	lock_release(&filesys_lock);
@@ -206,12 +224,21 @@ tell(int fd)
 void
 close(int fd)
 {
+	if(fd<2 || fd>=thread_current()->fd)
+  	{
+    	exit(-1);
+  	}
+
 	struct file_element *fe = find_file(fd);
 	if(fe==NULL)
-		return -1;
+		return;
+
 	lock_acquire(&filesys_lock);
+
 	file_close(fe->file);
 	lock_release(&filesys_lock);
+	list_remove(&fe->elem);
+	free(fe);
 }
 
 static void

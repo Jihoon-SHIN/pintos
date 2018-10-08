@@ -71,6 +71,15 @@ start_process (void *f_name)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
+  if(success)
+  {
+    thread_current()->child_p->load = 2;
+  }
+  else
+  {
+    thread_current()->child_p->load = 1;
+  }
+  sema_up(&thread_current()->child_p->sema_load);
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
@@ -99,13 +108,16 @@ int
 process_wait (tid_t child_tid UNUSED) 
 {
   struct child_process *child_p = find_child_process(child_tid);
-  if(child_p == NULL || child_p->parent_pid != thread_current()->tid)
+  if(child_p == NULL )
     return -1;
 
-  if(child_p->alive)
-  {
+  if(child_p->parent_pid != thread_current()->tid)
+    return -1;
+
+  // if(child_p->alive)
+  // {
     sema_down(&child_p->sema_wait);
-  }
+  // }
   int status = child_p->status;
   list_remove(&child_p->elem);
 
@@ -122,15 +134,18 @@ process_exit (void)
 
   struct list_elem *e;
   struct list child_list = curr->child_list;
-  struct child_process *child_p;
 
+  file_close(curr->file);
+  // close_all_file();
   // for(e=list_begin(&child_list); e!= list_end(&child_list); e= list_next(e))
   // {
-  //   child_p = list_entry(e, struct child_process, elem);
+  //   struct child_process *child_p = list_entry(e, struct child_process, elem);
   //   e = list_remove(&child_p->elem)->prev;
   //   free(child_p);
   // }
-  if(curr->child_p != NULL)
+
+  if(find_parent_thread(curr->child_p->parent_pid))
+  // if(curr->child_p != NULL)
   {
     sema_up(&curr->child_p->sema_wait);
   }
@@ -357,7 +372,15 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  if(success)
+  {
+    thread_current()->file = file;
+    file_deny_write(file);
+  }
+  else
+  {
+    file_close (file);
+  }
   return success;
 }
 
@@ -618,12 +641,13 @@ find_file(int fd)
 struct child_process *
 find_child_process(tid_t child_tid)
 {
-  struct list child_list = thread_current()->child_list;
+  // struct list child_list = thread_current()->child_list;
+  struct thread *cur = thread_current();
   struct list_elem *e;
-  struct child_process *child_p;
-  for(e=list_begin(&child_list); e!= list_end(&child_list); e= list_next(e))
+  
+  for(e=list_begin(&cur->child_list); e!= list_end(&cur->child_list); e= list_next(e))
   {
-    child_p = list_entry(e, struct child_process, elem);
+    struct child_process *child_p = list_entry(e, struct child_process, elem);
     if(child_p->pid == child_tid)
     {
       return child_p;
@@ -632,3 +656,17 @@ find_child_process(tid_t child_tid)
   return NULL;
 }
 
+
+/* Close all file that in the thread_current file_list */
+void
+close_all_file(void)
+{
+  struct list_elem *e;
+  struct list_elem *next;
+  for(e= list_begin(&thread_current()->file_list) ; e != list_end(&thread_current()->file_list) ; e = next)
+  {
+    next = list_next(e);
+    struct file_element *fe = list_entry(e, struct file_element, elem);
+    close(fe->file);
+  }
+}
