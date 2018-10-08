@@ -41,7 +41,7 @@ process_execute (const char *file_name)
   if (fn_copy == NULL || fn_copy2 ==NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
-  strlcpy (fn_copy, file_name, PGSIZE);
+  strlcpy (fn_copy2, file_name, PGSIZE);
 
   fn_copy2 = strtok_r(fn_copy2, " ", &save_ptr);
   /* Create a new thread to execute FILE_NAME. */
@@ -324,7 +324,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* Set up stack. */
   if (!setup_stack (esp, file_name))
+  {
     goto done;
+  }
 
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
@@ -463,7 +465,9 @@ setup_stack (void **esp, char *argument_line)
         palloc_free_page (kpage);
   }
   argument_passing(esp, argument_line);
-  hex_dump(0xbfffffb4, 0xbfffffb4, sizeof(char) * 100, true);
+
+  /* To check User stack */
+  // hex_dump(0xbfffffb4, 0xbfffffb4, sizeof(char) * 100, true);
   return success;
 }
 
@@ -480,14 +484,14 @@ argument_passing(void **esp, char *argument_line)
   argv = (char **) malloc(sizeof(char *) * initial_size);
 
   /* Iterating of argument using strtok, store token in argv */
-  for(token=strtok_r(argument_line, " ", &save_ptr); token != NULL; token=strtok_r(NULL, " ", &save_ptr))
+  for(token=strtok_r(argument_line," ", &save_ptr); token != NULL; token=strtok_r(NULL, " ", &save_ptr))
   {
     argc++;
     if(argc != 1)
     {
-      argv = (char **)realloc(sizeof(char *)*argc);
+      argv = (char **)realloc(argv, sizeof(char *)*argc);
     }
-    argv[argc-1] = (char *)malloc(sizeof(char)*strlen(token)+1);
+    argv[argc-1] = (char *)malloc(sizeof(char)*(strlen(token)+1));
     strlcpy(argv[argc-1], token, strlen(token)+1);
   }
 
@@ -504,7 +508,6 @@ argument_passing(void **esp, char *argument_line)
     argv_addr[i] = *esp;
     free(argv[i]);
   }
-
   /* Aligning the word, if need */
   int word_align = (size_t)*esp % 4;
   if(word_align)
@@ -522,7 +525,6 @@ argument_passing(void **esp, char *argument_line)
     if(i==argc)
     {
       memcpy(*esp, &argv[argc], sizeof(char *));
-      printf("Hello welcome %d\n", &argv[argc]);
     }
     else
     {
