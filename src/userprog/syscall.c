@@ -34,6 +34,7 @@ get_user (const uint8_t *uaddr)
   return result;
 }
 
+/* Do get user by 4 byte unit */
 static int
 get_arg(const uint8_t *uaddr)
 {
@@ -49,8 +50,6 @@ get_arg(const uint8_t *uaddr)
 	}
 	return total_result;
 }
-
-
 
 /* Writes BYTE to user address UDST.
    UDST must be below PHYS_BASE.
@@ -90,10 +89,8 @@ int exec(const char *cmd_line)
 	lock_acquire(&exec_exit_lock);
 	int pid_p = process_execute(cmd_line);
 	struct child_process *child_p = find_child_process(pid_p);
-	while(child_p->load==0)
-	{
-		sema_down(&child_p->sema_load);
-	}
+
+	sema_down(&child_p->sema_load);
 	if(child_p->load == 1)
 	{
 		lock_release(&exec_exit_lock);
@@ -234,7 +231,6 @@ close(int fd)
 		return;
 
 	lock_acquire(&filesys_lock);
-
 	file_close(fe->file);
 	lock_release(&filesys_lock);
 	list_remove(&fe->elem);

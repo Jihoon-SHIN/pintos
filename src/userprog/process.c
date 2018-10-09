@@ -8,6 +8,7 @@
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
+#include "userprog/syscall.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -18,12 +19,14 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
+
+
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 void argument_passing(void **esp, char *argument_line);
 
 /* Starts a new thread running a user program loaded from
-   FILENAME.  The new thread may be scheduled (and may even exit)
+   FILENAME.  The new thread may be scheduled (and may even )
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
 tid_t
@@ -109,15 +112,20 @@ process_wait (tid_t child_tid UNUSED)
 {
   struct child_process *child_p = find_child_process(child_tid);
   if(child_p == NULL )
+  {
     return -1;
+  }
 
   if(child_p->parent_pid != thread_current()->tid)
+  {
     return -1;
+  }
 
   // if(child_p->alive)
   // {
-    sema_down(&child_p->sema_wait);
+  sema_down(&child_p->sema_wait);
   // }
+  
   int status = child_p->status;
   list_remove(&child_p->elem);
 
@@ -133,19 +141,28 @@ process_exit (void)
   uint32_t *pd;
 
   struct list_elem *e;
-  struct list child_list = curr->child_list;
+  struct list_elem *ee;
 
   file_close(curr->file);
+
   // close_all_file();
-  // for(e=list_begin(&child_list); e!= list_end(&child_list); e= list_next(e))
-  // {
-  //   struct child_process *child_p = list_entry(e, struct child_process, elem);
-  //   e = list_remove(&child_p->elem)->prev;
-  //   free(child_p);
-  // }
+
+  for(ee=list_begin(&curr->file_list); ee!= list_end(&curr->file_list); ee= list_next(ee))
+  {
+    struct file_element *fe = list_entry(ee, struct file_element, elem);
+    file_close(fe->file);
+    ee= list_remove(&fe->elem)->prev;
+    free(fe);
+  }
+
+  for(e=list_begin(&curr->child_list); e!= list_end(&curr->child_list); e= list_next(e))
+  {
+    struct child_process *child_p = list_entry(e, struct child_process, elem);
+    e = list_remove(&child_p->elem)->prev;
+    free(child_p);
+  }
 
   if(find_parent_thread(curr->child_p->parent_pid))
-  // if(curr->child_p != NULL)
   {
     sema_up(&curr->child_p->sema_wait);
   }
@@ -641,7 +658,6 @@ find_file(int fd)
 struct child_process *
 find_child_process(tid_t child_tid)
 {
-  // struct list child_list = thread_current()->child_list;
   struct thread *cur = thread_current();
   struct list_elem *e;
   
@@ -662,11 +678,12 @@ void
 close_all_file(void)
 {
   struct list_elem *e;
-  struct list_elem *next;
-  for(e= list_begin(&thread_current()->file_list) ; e != list_end(&thread_current()->file_list) ; e = next)
+  for(e= list_begin(&thread_current()->file_list) ; e != list_end(&thread_current()->file_list) ; e =list_next(e))
   {
-    next = list_next(e);
     struct file_element *fe = list_entry(e, struct file_element, elem);
-    close(fe->file);
+    file_close(fe->file);
+    // list_remove(&fe->elem);
+    // free(fe);
+    // close(fe->fd);
   }
 }

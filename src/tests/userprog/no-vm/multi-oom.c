@@ -125,25 +125,30 @@ main (int argc, char *argv[])
   for (i = 0; i < howmany; i++)
     {
       pid_t child_pid;
-
+      int a;
       /* Spawn a child that will be abnormally terminated.
          To speed the test up, do this only for processes
          spawned at a certain depth. */
+      printf("n %d\n", n);
+      printf("expectd %d\n", EXPECTED_DEPTH_TO_PASS/2);
       if (n > EXPECTED_DEPTH_TO_PASS/2)
         {
           child_pid = spawn_child (n + 1, CRASH);
+          printf("child_pid1 %d\n", child_pid);
           if (child_pid != -1)
             {
-              if (wait (child_pid) != -1)
+              a = wait (child_pid);
+              printf("wait %d\n", a);
+              // if (wait (child_pid) != -1)
+              if(a!= -1)
                 fail ("crashed child should return -1.");
             }
           /* If spawning this child failed, so should
              the next spawn_child below. */
         }
-
       /* Now spawn the child that will recurse. */
       child_pid = spawn_child (n + 1, RECURSE);
-
+      printf("child_pid2 %d\n", child_pid);
       /* If maximum depth is reached, return result. */
       if (child_pid == -1)
         return n;
@@ -163,9 +168,7 @@ main (int argc, char *argv[])
               i, howmany, expected_depth, reached_depth);
       ASSERT (expected_depth == reached_depth);
     }
-
   consume_some_resources ();
-
   if (n == 0)
     {
       if (expected_depth < EXPECTED_DEPTH_TO_PASS)
