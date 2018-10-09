@@ -238,11 +238,8 @@ thread_create (const char *name, int priority,
   child_p->pid = tid;
   child_p->parent_pid = thread_current()->tid;
   child_p->load = DEFAULT_VALUE;
-  child_p->exit = DEFAULT_VALUE;
-  child_p->wait = DEFAULT_VALUE;
   child_p->status = DEFAULT_VALUE;
 
-  child_p->alive = 1;
   sema_init(&child_p->sema_wait, 0);
   sema_init(&child_p->sema_load, 0);
   list_push_back(&thread_current()-> child_list, &child_p->elem);

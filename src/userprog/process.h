@@ -24,12 +24,8 @@ struct child_process
 	int parent_pid;       	/* pid foe parent */
 
 	int load;             	/* Checking the load. 0 1 2 */
-	int alive;
-	bool wait;
-	bool exit;
 	int status;           	 /* child status, which is used exit status */
 
-	struct lock wait_lock;
 	struct semaphore sema_wait;  	/* Sema for wait <-> exit */
  	struct semaphore sema_load; /* Sema for exec <-> load */
  	struct list_elem elem;

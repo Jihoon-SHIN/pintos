@@ -143,8 +143,7 @@ open(const char *file)
 	fe->file = f;
 	fe->fd = thread_current()->fd;
 	list_push_back(&thread_current()->file_list, &fe->elem);
-	int return_value = thread_current()->fd++;
-	return return_value;
+	return thread_current()->fd++;;
 }
 
 int
