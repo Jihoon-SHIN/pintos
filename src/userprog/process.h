@@ -20,23 +20,23 @@ void close_all_file(void);
  // Child process control block 
 struct child_process
 {
-	int pid;              	/* pid for child */
-	int parent_pid;       	/* pid foe parent */
+	int pid;              			/* pid for child */
+	int parent_pid;       			/* pid foe parent */
 
-	int load;             	/* Checking the load. 0 1 2 */
-	int status;           	 /* child status, which is used exit status */
+	int load;             			/* Checking the load. 0 1 */
+	int status;           	 		/* child status, which is used exit status */
 
 	struct semaphore sema_wait;  	/* Sema for wait <-> exit */
- 	struct semaphore sema_load; /* Sema for exec <-> load */
- 	struct list_elem elem;
+ 	struct semaphore sema_load; 	/* Sema for exec <-> load */
+ 	struct list_elem elem;			/* To use list */
 };
 
+ //To manage the file, useful struct
 struct file_element
 {
-	int fd;
-	struct file *file;
-
-	struct list_elem elem;
+	int fd;							/* File descriptor */
+	struct file *file;				/* file struct */
+	struct list_elem elem;			/* To use list */
 };
 /* USERPROG2 */
 

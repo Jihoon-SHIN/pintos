@@ -237,7 +237,7 @@ thread_create (const char *name, int priority,
   struct child_process *child_p = malloc(sizeof(struct child_process));
   child_p->pid = tid;
   child_p->parent_pid = thread_current()->tid;
-  child_p->load = DEFAULT_VALUE;
+  child_p->load = 1;
   child_p->status = DEFAULT_VALUE;
 
   sema_init(&child_p->sema_wait, 0);

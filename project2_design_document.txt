@@ -1,0 +1,243 @@
+			+---------------------------+
+			|		CS 330				|
+			| PROJECT 2: USER PROGRAMS	|
+			| 	   DESIGN DOCUMENT     	|
+			+---------------------------+
+
+---- GROUP ----
+
+>> Fill in the names and email addresses of your group members.
+
+신지훈 <jihoon9030@kaist.ac.kr>
+김태연 <ktyty7@kaist.ac.kr>
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for the
+>> TAs, or extra credit, please give them here.
+
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation, course
+>> text, lecture notes, and course staff.
+
+			   ARGUMENT PASSING
+			   ================
+
+---- DATA STRUCTURES ----
+
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+-threads/thread.h
+struct thread{
+    ….
+    int fd;                             /* file descriptor */
+    struct list file_list;
+    struct list child_list;
+    struct child_process *child_p;
+    struct file *file;
+   ….
+}
+
+thread 구조체에 userprog을 위한 struct member를 추가했다. fd은 file descriptor로 open file들에게 고유한 아이디를 부여하기 위함이다. file_list는 open file들을 저장하는 리스트이다. child_list는 child thread들을 저장하는 스레드이다. thread가 create될 때 저장한다. child_p는 새로 선언한 child_process라는 구조체이고, child_process 구조체는 자신이 child process일 때 자신의 process id와 parent id, status, 여러 semaphore들을 저장하는 구조체이다. 쉽게 얘기하면 child process block이다.
+
+-userprog/process.h
+struct child_process
+{
+	int pid;              	/* pid for child */
+	int parent_pid;       	/* pid for parent */
+
+	int load;             	/* Checking the load. 0 1  */
+	int status;           	 /* child status, which is used exit status */
+
+	struct semaphore sema_wait;  	/* Sema for wait <-> exit */
+ 	struct semaphore sema_load; /* Sema for exec <-> load */
+ 	struct list_elem elem;
+};
+
+위에서 설명한 child_process 구조체이다. child process의 필요한 정보들을 저장하기 위함이다. pid는 child 자신의 id, parent_pid는 parent process id 를 저장한다. load는 syscall에서 exec가 실행됐을 때 load가 되었는 지 확인하기 위한 변수이다. status는 exit status 를 저장하기 위함인데, child process를 parent process가 기다리고 있을 때에는 child process의 status 는 parent의 status가 되기 때문에 저장하는 것이 용이하다.
+
+sema_wait은 parent가 child를 wait할 때 사용하는 semaphore이고, sema_load는 exec을 할 때에 load하기 전에 exec가 실행되지 않게 기다리기 위한 semaphore이다. 
+
+struct file_element
+{
+	int fd;
+	struct file *file;
+	struct list_elem elem;
+};
+
+file_element는 file을 open하고 close, find할 때 쉽게 하기 위해서 만든 구조체이다. 우리가 만든 fd는 현재의 file 구조체에 선언되어있지 않으므로 따로 file_element라는 구조체를 만들면 쉽게 코드를 작성할 수 있다. 따라서 syscall에서 open을 통해 file 이 open되면 file_element 구조체를 만들어서 오픈 파일들을 쉽게 관리할 수 있다.
+
+
+
+
+---- ALGORITHMS ----
+
+>> A2: Briefly describe how you implemented argument parsing.  How do
+>> you arrange for the elements of argv[] to be in the right order?
+>> How do you avoid overflowing the stack page?
+
+process_execute()가 호출되면 strtok_r를 통해 *file_name의 first word의 복사본이 thread_create()의 첫번째 argument로, *file_name 전체의 복사본이 thread_create()의 네번째 argument로 들어간다. 그 첫번째 argument는 thread의 name으로 저장되고, 네번째 argument는 일련의 과정을 통해 load()의 argument로 들어간다. 
+
+load()에서는 마찬가지로 strtok_r를 통해 first word, 즉 program name이 filesys_open()의 argument가 되어 program file을 open한다. 이후 stack을 set up 하기 위해 setup_stack(esp, file_name)이 호출되고, 여기서 palloc_get_page()와 install_page()가 성공하면 *esp를 PHYS_BASE로 설정 후 argument_passing(esp, argument_line)을 호출한다.
+
+argument_passing에서는 본격적인 parsing을 하는데, 먼저 argv를 (char *) 크기의 initial_size배로 malloc한다. 이후 for문에서의 strtok_r을 이용하여 공백을 기준으로 word를 나눈다. for문 안에서 argc를 세고, argv[argc-1]에 parse된 word의 길이 + 1의 크기로 malloc 하는데, 이 때 argc가 1보다 클 경우 argv를 realloc한 후 malloc을 호출한다. argv[argc-1]에는 해당 word를 저장한다. for문을 빠져 나온 후, 우선 calling convention대로 argv[argc]=0 으로 설정한다.
+
+parsing이 다 끝난 후에는 argv[argc-1]부터 argv[1]에 해당하는 문자열을 차례대로 *esp, 즉 stack pointer를 감소시키며 stack에 복사, 저장한다. 또한 해당 stack pointer를 argv_addr 배열에 저장한다. *esp가 4로 나누어지지 않을 경우 그만큼 0으로 word align을 한다. 다음으로는 argv[argc] (= 0 by calling convention), argv_addr[argc-1] ~ argv_addr[0]에 해당하는 값들을 마찬가지로 stack pointer를 감소시키며 stack에 저장한다. 또한 argv[0]의 stack 상 주소, argc, return address (= 0)을 차례대로 stack에 push한다. allocate 해주었던 요소들은 적절히 free 한다.
+
+결과적으로 pintos document 3.5.1의 예제와 같은 방식인 calling convention으로 stack을 set up 하게 된다.
+
+
+Stack page가 overflow한 경우에는 ‘magic’이 변동되므로 overflow가 발생했음을 알 수 있다. 이 경우 그 thread를 kill 함으로써 stack page overflowing을 피할 수 있다.
+
+---- RATIONALE ----
+
+>> A3: Why does Pintos implement strtok_r() but not strtok()?
+
+strtok()에서는 static char* 변수를 사용한다. 즉, static 으로 선언되어 프로그램의 data영역에 저장된다. data영역에는 global variable 도 포함되는데, 어디서나 접근이 가능하다는 것이다. multi thread programming이나 kernel에서의 thread들은 안전하지 않다. Pintos는 kernel thread들을 사용하므로, strtok를 사용하는 것이 적절하지 못하다. 이에 대한 대안으로 나온 것이 stortok_r() 으로, strotk()와 다르게 안전하다.
+
+>> A4: In Pintos, the kernel separates commands into a executable name
+>> and arguments.  In Unix-like systems, the shell does this
+>> separation.  Identify at least two advantages of the Unix approach.
+
+kernel까지 가기 전에 valid한 argument line인지 체크 가능하고, 특히 invalid 할 경우 kernel에서의 불필요한 작업시간을 줄일 수 있다. 또한 자주 사용되는 executable을 명령어처럼 저장해 놓고 사용하거나 user 친화적인 기능을 추가하는 등의 부가적인 효과를 볼 수 있다.
+
+			     SYSTEM CALLS
+			     ============
+
+---- DATA STRUCTURES ----
+
+>> B1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+
+-userprog/syscall.h
+struct lock filesys_lock;	/* filesys lock. filesys can execute one by one */
+struct lock exec_exit_lock;	/* Synchronizaion of exec and exit */
+
+filesys_lock은 filesys의 코드는 동시에 실행되어서는 안된다. 한 process가 read를 하는 도중에 write를 해버린다던가, 그 반대의 경우 결과 값이 매 실행마다 달라질 수 있고 치명적 오류를 남길 수 있다. 따라서 filesys 코드를 실행할 때에는 항상 lock을 사용해주어야하므로 filesys_lock을 선언하여 사용한다. 
+
+exec_exit_lock은 exec과 exit을 동시에 실행할 수 없게끔 하기 위해서 선언한다. exit과 exec은 atomitically 하게 실행되지 않으면 exec하고 있는 process의 정보가 날아가거나 엉켜서 치명적인 오류를 남길 수 있게 되므로, lock을 사용한다.
+
+
+>> B2: Describe how file descriptors are associated with open files.
+>> Are file descriptors unique within the entire OS or just within a
+>> single process?
+
+각 thread의 fd는 init_thread()에서 2로 초기화된다. 0과 1은 STDIN과 STDOUT이기 때문이다. open()이 호출되었을 때 해당 file에 현재 thread의 fd를 대응시키고, 이후 현재 thread의 fd를 1 증가시키고 그 값을 반환한다. 이 밖에는 fd를 수정할 수 있는 방법은 없다. 따라서 file descriptors는 각각의 single process에 한하여 unique 하다고 볼 수 있다.
+
+---- ALGORITHMS ----
+
+>> B3: Describe your code for reading and writing user data from the
+>> kernel.
+
+read, write syscall을 이용하여 데이터를 읽기 쓰기를 한다. read와 write 공통적으로 syscall을 할 때에는 valid한 주소의 포인터인지 확인하여야한다. 이는, pintos document에서 주어진 get_user 코드를 이용한다. 그렇게 하여, int fd, void* buffer, unsigned size 이 세 개의 인자를 넣어준다.
+
+read의 경우, fd가 STDIN_FILENO(0) 일 경우를 확인하여 처리해주고, 0이 아니라면 read이므로 open된 적이 없으면 안된다. 우리는 file_element라는 구조체를 open된 파일마다 생성해주었으므로 fd값을 가지고 있는 file_element 가 있는 지 확인하고 없으면 -1 을 return 해주고 그것이 아니라면, filesys_lock을 걸고 file_read를 이용하여 fe->file에서 size만큼 버퍼에 읽는다. 그 후, filesys_lock을 release한다.
+
+wrtie도 read와 마찬가지이다. STDOUT_FILENO(1)을 확인해서 처리하고, fe가 있는 지 확인한 후, filesys_lock을 acquire하고 file_write를 이용하여 size만큼 버퍼에 쓴다. 그 후 filesys_lock을 release해준다.
+
+>> B4: Suppose a system call causes a full page (4,096 bytes) of data
+>> to be copied from user space into the kernel.  What is the least
+>> and the greatest possible number of inspections of the page table
+>> (e.g. calls to pagedir_get_page()) that might result?  What about
+>> for a system call that only copies 2 bytes of data?  Is there room
+>> for improvement in these numbers, and how much?
+
+installing page를 할 때 page inspection이 발생한다. 최소 횟수는 4096 bytes가 한 page에 있을 경우에 1번, 그렇지 않을 경우 최대 2번의 inspections가 발생한다. data가 2 bytes 일 때도 마찬가지로 최대 2번, 최소 1번이다.
+
+>> B5: Briefly describe your implementation of the "wait" system call
+>> and how it interacts with process termination.
+
+wait system call에서는 바로 process.c 의 int process_wait(tid_t child_tid) 함수를 호출한다. process_wait는 parent process가 child_tid 값을 가진 child_process를 기다리는 것이다. 우리는 child_process가 생성될 때마다 parent thread 구조체에 있는 멤버인 child_list에 child_process를 저장했다. 그러므로 처음에, child_tid를 가진 child process가 child_list에 있는 지 확인한다. 없다면 -1 을 리턴하고, 만약 이 child의 parent_pid와 thread_current()->tid 가 다르면 wait하는 대상이 다른 것이므로 -1을 리턴한다.
+
+예외 상황을 모두 처리하고 나면, sema_down을 이용해서 기다린다. 위에서 찾아낸 child_proess인 child_p의 sema_wait 이라는 semaphore를 사용한다. 이 semaphore는 초기에 sema value가 0으로 초기화되어있으므로 바로 wait하게 된다. 이 wait은 child process가 exit할 때까지 지속될 것이다.
+
+process_exit을 살펴보자. 우선 executable file, open file, child들을 모두 remove해주고 free해준다. 그 후 이 process를 기다리고 있는 parent process가 있는 지 확인한다. 이것은 생성된 모든 thread에서 이 thread에 대한 parent thread가 있는 지 확인하는 것으로 충분하다. 만약 parent process가 있다면, sema_up(&thread_current()->child_p->sema_wait)을 해준다. 이로써 위에서 sema_down으로 기다리고 있던 parent process는 child process가 정상적으로 종료되었음을 알 수 있고 parent도 종료한다.
+
+>> B6: Any access to user program memory at a user-specified address
+>> can fail due to a bad pointer value.  Such accesses must cause the
+>> process to be terminated.  System calls are fraught with such
+>> accesses, e.g. a "write" system call requires reading the system
+>> call number from the user stack, then each of the call's three
+>> arguments, then an arbitrary amount of user memory, and any of
+>> these can fail at any point.  This poses a design and
+>> error-handling problem: how do you best avoid obscuring the primary
+>> function of code in a morass of error-handling?  Furthermore, when
+>> an error is detected, how do you ensure that all temporarily
+>> allocated resources (locks, buffers, etc.) are freed?  In a few
+>> paragraphs, describe the strategy or strategies you adopted for
+>> managing these issues.  Give an example.
+
+문제의 요점:
+how to avoid such an obscure situation
+when error, how to free all resources?
+(with example)
+
+System call 등에서 user-specified address로부터의 access는 invalid pointer에 의한 것일 수 있다. 예를 들어, 질문에서처럼 "write" system call은 세 개의 argument를 필요로 하는데 이에 문제가 발생할 수 있다. System call의 arguments를 구할 때에는 pintos document의 get_user()를 활용하게 되는데, 우선 읽고자 하는 주소가 PHYS_BASE와 같거나 그보다 클 경우 -1을 return하여, get_arg()에서 exit(-1)이 호출된다. PHYS_BASE보다 작지만 invalid할 경우에는 "page fault"가 발생하게 되는데, 이 경우 page_fault()에 의해 eip에 eax가, eax에는 0xffffffff가 저장된 후 exit(-1)이 호출되면서 handle할 수 있다. 각각의 경우에 all temporarily allocated resources는 process_exit() call을 거치며 적절히 free 해줄 수 있다.
+
+---- SYNCHRONIZATION ----
+
+>> B7: The "exec" system call returns -1 if loading the new executable
+>> fails, so it cannot return before the new executable has completed
+>> loading.  How does your code ensure this?  How is the load
+>> success/failure status passed back to the thread that calls "exec"?
+
+이것은 semaphore를 이용한다. exec에서 process_exectute를 실행하고 thread_create에서 start_process 함수가 실행되어 load가 실행된다. load가 실행되기 전에 exec syscall이 진행되면 안된다. 따라서 process_exectute가 실행된 직후에, child_p에 선언해둔, sema_load를 down한다. 이 semaphore도 value가 0으로 초기화되어있으므로 호출 즉시 wait된다. 그 후, start process에서 load함수를 실행시키고 만약 success가 아니라면 child_p struct에 load라는 값을 1로 바꿔준다. 이는 우리가 정한 값으로 로드가 실패했다는 이야기이다. 그리고 start_process에서 sema_up을 해주고 exec syscall에서 child_p->load값이 0인지 1인지 확인해서 1이면 return -1을 해준다. 이러면 executable file 이 로드가 실패했다는 소리이므로 안정적으로 -1을 리턴할 수 있다.만약 load값이 0이면 정상적으로 실행한다.
+
+>> B8: Consider parent process P with child process C.  How do you
+>> ensure proper synchronization and avoid race conditions when P
+>> calls wait(C) before C exits?  After C exits?  How do you ensure
+>> that all resources are freed in each case?  How about when P
+>> terminates without waiting, before C exits?  After C exits?  Are
+>> there any special cases?
+
+C가 exit 하기 전에 P가 wait(C) 할 경우, C의 child_p의 sema_wait이라는 semaphore가 sema_down 된다. 이 semaphore는 0으로 초기화 되어있으므로 sema_down이 먼저 호출되면 바로 대기한다. 따라서 C가 exit하며 그 semaphore를 sema_up 할 때까지 기다리게 되고, race condition이 해결된다. wait의 마지막에 C의 child_p가 free된다.
+C가 exit 한 후 P가 wait(C) 한 경우에도 sema_wait이라는 semaphore가 sema_up 한다. 0으로 초기화 되어있으므로 sema->value가 1로 될 것이고 P가 나중에 wait(C)하게 되어도, sema_down에서 기다리지 않고 바로 진행할 수 있으므로 race condition이나, 무한대기에 걸리지 않을 수 있다.
+C가 exit 하기 전에, 혹은 하고 나서 P가 wait 없이 종료되었을 경우, P의 exit 과정에서 child들을 모두 free해주게 구현했다.
+
+---- RATIONALE ----
+
+>> B9: Why did you choose to implement access to user memory from the
+>> kernel in the way that you did?
+
+우리는 get_user를 사용했다. leak resource를 줄일 수 있고, 핀토스 document에서 대부분의 구현을 도와주었으므로 쉽게 사용할 수 있었다.
+
+
+>> B10: What advantages or disadvantages can you see to your design
+>> for file descriptors?
+
+단순히 fd를 증가시키는 것만으로 process 내의 각 file descriptor의 uniqueness를 보장할 수 있다. 따라서 fd가 int의 최대 크기를 넘기지 않는 한 안정적으로 사용 가능하다.
+
+>> B11: The default tid_t to pid_t mapping is the identity mapping.
+>> If you changed it, what advantages are there to your approach?
+
+우리는 바꾸지 않았다. 바꾸지 않는 것이 더 좋다고 생각했기 때문이다.
+
+
+			   SURVEY QUESTIONS
+			   ================
+
+Answering these questions is optional, but it will help us improve the
+course in future quarters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the quarter.
+
+>> In your opinion, was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+
+>> Is there some particular fact or hint we should give students in
+>> future quarters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future quarters or the remaining projects?
+
+>> Any other comments?
+

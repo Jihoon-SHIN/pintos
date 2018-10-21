@@ -43,9 +43,10 @@ process_execute (const char *file_name)
   fn_copy2 = palloc_get_page(0);
   if (fn_copy == NULL || fn_copy2 ==NULL)
     return TID_ERROR;
+
   strlcpy (fn_copy, file_name, PGSIZE);
   strlcpy (fn_copy2, file_name, PGSIZE);
-
+  /* Parsing the file name from command including arguments */
   fn_copy2 = strtok_r(fn_copy2, " ", &save_ptr);
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (fn_copy2, PRI_DEFAULT, start_process, fn_copy);
@@ -74,13 +75,9 @@ start_process (void *f_name)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
-  if(success)
+  if(!success)
   {
-    thread_current()->child_p->load = 2;
-  }
-  else
-  {
-    thread_current()->child_p->load = 1;
+    thread_current()->child_p->load = 0;
   }
   sema_up(&thread_current()->child_p->sema_load);
   /* If load failed, quit. */
@@ -122,7 +119,7 @@ process_wait (tid_t child_tid UNUSED)
     return -1;
   }
  
-  // printf("wait %d\n", child_p->pid);
+  /* sema_up if child process terminates */
   sema_down(&child_p->sema_wait);
 
   int status = child_p->status;
@@ -139,16 +136,12 @@ process_exit (void)
   struct thread *curr = thread_current ();
   uint32_t *pd;
 
-  // struct list_elem *e;
-  // struct list_elem *ee;
-
-  struct list_elem *e, *next_e = list_begin(&curr->child_list);
-  struct list_elem *ee, *next_ee = list_begin(&curr->file_list);
+  struct list_elem *e;
+  struct list_elem *ee;
 
   file_close(curr->file);
 
-  // close_all_file();
-
+  // close_all_file
   for(ee=list_begin(&curr->file_list); ee!= list_end(&curr->file_list); ee= list_next(ee))
   {
     struct file_element *fe = list_entry(ee, struct file_element, elem);
@@ -157,6 +150,7 @@ process_exit (void)
     free(fe);
   }
 
+  // Free the all child
   for(e=list_begin(&curr->child_list); e!= list_end(&curr->child_list); e= list_next(e))
   {
     struct child_process *child_p = list_entry(e, struct child_process, elem);
@@ -164,39 +158,11 @@ process_exit (void)
     free(child_p);
   }
 
-  // while(ee!= list_end(&curr->file_list))
-  // {
-  //   next_ee = list_next(ee);
-  //   struct file_element *fe = list_entry(ee, struct file_element, elem);
-  //   file_close(fe->file);
-  //   list_remove(&fe->elem);
-  //   free(fe);
-  //   ee= next_ee;
-  // }
-
-  // while(e != list_end(&curr->child_list))
-  // {
-  //   next_e = list_next(e);
-  //   struct child_process *child_p = list_entry(e, struct child_process, elem);
-  //   list_remove(&child_p->elem);
-  //   free(child_p);
-  //   e = next_e;
-  // }
-
-
+  // For parent that waits child to be terminated. Synchronization
   if(find_parent_thread(curr->child_p->parent_pid))
   {
-    // printf("exit %d\n", curr->child_p->pid);
-    // printf("exit 2 %d\n", curr->child_p->status );
     sema_up(&curr->child_p->sema_wait);
   }
-
-  // for(e=list_begin(&curr->child_list); e!= list_end(&curr->child_list); e= list_next(e))
-  // {
-  //   struct child_process *child_p = list_entry(e, struct child_process, elem);
-  //   e = list_remove(&child_p->elem)->prev;
-  //   free(child_p);
-  // }
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = curr->pagedir;
@@ -420,6 +386,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
+  /* Excutable file must be denied write. Must not change. */
   if(success)
   {
     thread_current()->file = file;
@@ -668,6 +635,8 @@ install_page (void *upage, void *kpage, bool writable)
 /* This is own code */
 
 /* Project2 USERPROG */
+
+/* Find the file_element struct in file_list */
 struct file_element *
 find_file(int fd)
 {
@@ -686,6 +655,7 @@ find_file(int fd)
   return NULL;
 }
 
+/* Find the child_process_block(child_p) that has child_tid in child_list */
 struct child_process *
 find_child_process(tid_t child_tid)
 {

@@ -10,6 +10,7 @@ static void syscall_handler (struct intr_frame *);
 void exit(int status);
 
 
+/* Init function */
 void
 syscall_init (void) 
 {
@@ -54,6 +55,8 @@ get_arg(const uint8_t *uaddr)
 /* Writes BYTE to user address UDST.
    UDST must be below PHYS_BASE.
    Returns true if successful, false if a segfault occurred. */
+
+/* I don't use this */
 static bool
 put_user (uint8_t *udst, uint8_t byte)
 {
@@ -63,7 +66,7 @@ put_user (uint8_t *udst, uint8_t byte)
   return error_code != -1;
 }
 
-
+/* Syscall function */
 void halt(void)
 {
 	power_off();
@@ -91,7 +94,7 @@ int exec(const char *cmd_line)
 	struct child_process *child_p = find_child_process(pid_p);
 
 	sema_down(&child_p->sema_load);
-	if(child_p->load == 1)
+	if(!child_p->load)
 	{
 		lock_release(&exec_exit_lock);
 		return -1;
@@ -236,6 +239,7 @@ close(int fd)
 	free(fe);
 }
 
+/* Syscall_handler */
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
