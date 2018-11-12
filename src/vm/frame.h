@@ -15,13 +15,13 @@ struct frame_table_entry
 {
 	void* frame;
 	struct thread *thread;
-	// struct sup_page_table_entry *spte;
+	struct sup_page_table_entry *spte;
 	// int count_LRU;
 	struct list_elem elem;
 };
 
-uint8_t *frame_allocate(enum palloc_flags flags);
+uint8_t *frame_allocate(enum palloc_flags flags, struct sup_page_table_entry * spte);
 struct frame_table_entry * frame_find(void *frame);
 void frame_free(void *frame);
-
+void evict_frame(void);
 #endif

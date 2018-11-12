@@ -189,7 +189,6 @@ page_fault (struct intr_frame *f)
 
   if(!check_stack_size && (check_push || fault_addr >=esp || check_pushA))
   {
-    // printf("HI\n");
     page_grow_stack(fault_addr);
     return;
   }

@@ -484,8 +484,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
       /* Get a page of memory. */
     #ifdef VM
-      page_file(file, ofs, upage, read_bytes, zero_bytes, writable);
-      uint8_t *kpage = frame_allocate(PAL_USER);
+      struct sup_page_table_entry *spte = page_file(file, ofs, upage, read_bytes, zero_bytes, writable);
+      uint8_t *kpage = frame_allocate(PAL_USER, spte);
       if (kpage == NULL)
         return false;
 

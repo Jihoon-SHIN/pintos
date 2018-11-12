@@ -15,6 +15,7 @@ enum page_type
 {
 	PAGE_STACK,
 	PAGE_FILE,
+	PAGE_SWAP,
 };
 
 struct sup_page_table_entry
@@ -29,13 +30,15 @@ struct sup_page_table_entry
 	size_t page_read_bytes;
 	size_t page_zero_bytes;
 
+	int swap_index;
 	struct list_elem elem;
 
 };
 
 void page_grow_stack(void *addr);
-void page_file(struct file *file, off_t ofs, uint8_t *upage, size_t page_read_bytes, size_t page_zero_bytes, bool writable);
+struct sup_page_table_entry* page_file(struct file *file, off_t ofs, uint8_t *upage, size_t page_read_bytes, size_t page_zero_bytes, bool writable);
 bool page_load(void *addr);
 struct sup_page_table_entry* find_page(void *addr);
 bool page_load_file(struct sup_page_table_entry *spte);
+bool page_swap_in(struct sup_page_table_entry *spte);
 #endif
