@@ -526,6 +526,9 @@ init_thread (struct thread *t, const char *name, int priority)
   t->child_p = NULL;
   #endif
 
+  #ifdef VM
+  list_init(&t->spt);
+  #endif
   t->magic = THREAD_MAGIC;
 }
 

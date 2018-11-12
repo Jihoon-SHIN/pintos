@@ -5,6 +5,13 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "userprog/syscall.h"
+#include "threads/vaddr.h"
+
+#ifdef VM
+#include "vm/frame.h"
+#include "vm/page.h"
+#endif
+
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
@@ -127,6 +134,7 @@ page_fault (struct intr_frame *f)
   bool user;         /* True: access by user, false: access by kernel. */
   void *fault_addr;  /* Fault address. */
 
+  void *esp;
   /* Obtain faulting address, the virtual address that was
      accessed to cause the fault.  It may point to code or to
      data.  It is not necessarily the address of the instruction
@@ -148,8 +156,40 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
+  bool flag = true;
+
+  #ifdef VM
+  if(!not_present || !is_user_vaddr(fault_addr) || fault_addr <= BOTTOM_USER_VADDR)
+  {
+    exit(-1);
+  }
+  if(fault_addr >= PHYS_BASE)
+    exit(-1);
 
 
+  if(user)
+  {
+    esp = f->esp;
+  }
+  else
+  {
+    esp = thread_current()->esp;
+  }
+  bool check_stack_size = (fault_addr < PHYS_BASE - 0x800000);
+  bool check_push = (fault_addr==f->esp-4);
+  bool check_pushA = (fault_addr==f->esp-32);
+
+  printf("fault_addr %x\n", fault_addr);
+  printf("esp %x\n", esp);
+  printf("user %d\n", user);
+
+  if(!check_stack_size && (check_push || fault_addr >=esp || check_pushA))
+  {
+    page_grow_stack(fault_addr);
+    return;
+  }
+
+  #endif
   f->eip = f->eax;
   f->eax = 0xffffffff;
   exit(-1);

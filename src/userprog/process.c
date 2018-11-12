@@ -19,11 +19,14 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
-
+#include "vm/page.h"
+#include "vm/frame.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 void argument_passing(void **esp, char *argument_line);
+
+
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even )
@@ -401,7 +404,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
 /* load() helpers. */
 
-static bool install_page (void *upage, void *kpage, bool writable);
+bool install_page (void *upage, void *kpage, bool writable);
 
 /* Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */
@@ -480,6 +483,27 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
+    #ifdef VM
+      page_file(file, ofs, upage, read_bytes, zero_bytes, writable);
+      uint8_t *kpage = frame_allocate(PAL_USER);
+      if (kpage == NULL)
+        return false;
+
+      /* Load this page. */
+      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
+        {
+          frame_free(kpage);
+          return false; 
+        }
+      memset (kpage + page_read_bytes, 0, page_zero_bytes);
+
+      /* Add the page to the process's address space. */
+      if (!install_page (upage, kpage, writable)) 
+        {
+          frame_free(kpage);
+          return false; 
+        }
+    #else
       uint8_t *kpage = palloc_get_page (PAL_USER);
       if (kpage == NULL)
         return false;
@@ -499,10 +523,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
           return false; 
         }
 
+    #endif
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
+    #ifdef VM
+      ofs += PGSIZE;
+    #endif
     }
   return true;
 }
@@ -515,7 +543,15 @@ setup_stack (void **esp, char *argument_line)
   uint8_t *kpage;
   bool success = false;
 
+
+  #ifdef VM
+  page_grow_stack(((uint8_t *) PHYS_BASE) - PGSIZE);
+  success = true;
+  *esp = PHYS_BASE;
+  thread_current()->esp = esp;
+  #else
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+
   if (kpage != NULL) 
   {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
@@ -524,6 +560,7 @@ setup_stack (void **esp, char *argument_line)
       else
         palloc_free_page (kpage);
   }
+  #endif
   argument_passing(esp, argument_line);
 
   /* To check User stack */
@@ -620,7 +657,7 @@ argument_passing(void **esp, char *argument_line)
    with palloc_get_page().
    Returns true on success, false if UPAGE is already mapped or
    if memory allocation fails. */
-static bool
+bool
 install_page (void *upage, void *kpage, bool writable)
 {
   struct thread *t = thread_current ();

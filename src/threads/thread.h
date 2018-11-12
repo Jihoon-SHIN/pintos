@@ -107,6 +107,10 @@ struct thread
     struct file *file;
 #endif
 
+#ifdef VM
+    void* esp;
+    struct list spt;
+#endif
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };

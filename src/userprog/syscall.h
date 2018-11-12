@@ -3,6 +3,7 @@
 
 #include "threads/synch.h"
 
+#define BOTTOM_USER_VADDR ((void *) 0x08048000)
 
 void syscall_init (void);
 bool find_parent_thread(int parent_pid); /* Find the parent thread */
