@@ -548,7 +548,7 @@ setup_stack (void **esp, char *argument_line)
   page_grow_stack(((uint8_t *) PHYS_BASE) - PGSIZE);
   success = true;
   *esp = PHYS_BASE;
-  thread_current()->esp = esp;
+  thread_current()->esp = PHYS_BASE;
   #else
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
 

@@ -244,6 +244,9 @@ static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
   int sys_code = get_arg((int*)f->esp);
+  #ifdef VM
+  thread_current()->esp = f->esp;
+  #endif
   switch(sys_code)
   {
   	case SYS_HALT:

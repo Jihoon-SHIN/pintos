@@ -23,11 +23,15 @@ page_grow_stack(void *addr)
 	struct sup_page_table_entry *spte = malloc(sizeof(struct sup_page_table_entry));
 	bool success = false;
 
+	
+
+	uint8_t *kpage = frame_allocate(PAL_USER | PAL_ZERO);
+
 	spte->upage = pg_round_down(addr);
 	spte->type = PAGE_STACK;
 	spte->writable = true;
+	spte->kpage = kpage;
 
-	uint8_t *kpage = frame_allocate(PAL_USER | PAL_ZERO);
 
 	// printf("hello\n");
 	if (kpage != NULL) 
@@ -40,9 +44,11 @@ page_grow_stack(void *addr)
       // }
       if(!success)
       {
+      	free(spte);
         frame_free(kpage);
       }
 	}
+	list_push_back(&thread_current()->spt, &spte->elem);
 }
 
 void
@@ -50,6 +56,8 @@ page_file(struct file *file, off_t ofs, uint8_t *upage, size_t page_read_bytes, 
 {
 	struct sup_page_table_entry *spte = malloc(sizeof(struct sup_page_table_entry));
 
+	// printf("page file %x\n", upage);
+	// printf("page file %x\n", pg_round_down(upage));
 	spte->upage = upage;
 	spte->file = file;
 	spte->ofs = ofs;
@@ -61,21 +69,53 @@ page_file(struct file *file, off_t ofs, uint8_t *upage, size_t page_read_bytes, 
 }
 
 
+bool
+page_load(void *addr)
+{
+	struct sup_page_table_entry *spte = find_page(addr);
 
 
-// bool 
-// page_load_file(struct sup_page_table_entry *spte) 
-// {  
-//   uint8_t *kpage = frame_allocate(PAL_USER);
-//   spte->upage = kpage;
+	if(spte == NULL)
+		return false;
 
-//   /* Load this page. */
-//   if (file_read_at (page->file, kpage, page->page_read_bytes, page->ofs) != (int) page->page_read_bytes)
-//     ASSERT(0);
-//   memset (kpage + page->page_read_bytes, 0, page->page_zero_bytes);
 
-//   page->type = PAGE_LOADED;
+	switch(spte->type)
+	{
+		case PAGE_FILE:
+			page_load_file(spte);
+	}
+}
 
-//   return true;
-// }
+
+struct sup_page_table_entry*
+find_page(void *addr)
+{
+	struct list_elem *e;
+	uint8_t *addr_d = pg_round_down(addr);	
+	for(e=list_begin(&thread_current()->spt); e != list_end(&thread_current()->spt) ; e = list_next(e))
+	{
+		struct sup_page_table_entry * spte = list_entry(e, struct sup_page_table_entry, elem);
+		// printf("1 %x\n", spte->upage);
+		// printf("2 %x\n", addr_d);
+		if(spte->upage == addr_d)
+			return spte;
+	}
+	return NULL;
+}
+
+
+bool
+page_load_file(struct sup_page_table_entry *spte) 
+{  
+  uint8_t *kpage = frame_allocate(PAL_USER);
+  spte->kpage = kpage;
+
+  /* Load this page. */
+  if (file_read_at (spte->file, kpage, spte->page_read_bytes, spte->ofs) != (int) spte->page_read_bytes)
+    ASSERT(0);
+  memset (kpage + spte->page_read_bytes, 0, spte->page_zero_bytes);
+  // spte>type = PAGE_LOADED;
+
+  return true;
+}
 
