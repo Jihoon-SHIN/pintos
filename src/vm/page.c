@@ -52,6 +52,7 @@ page_file(struct file *file, off_t ofs, uint8_t *upage, size_t page_read_bytes, 
 	spte->page_zero_bytes = page_zero_bytes;
 	spte->writable = writable;
 	spte->type = PAGE_FILE;
+	
 	list_push_back(&thread_current()->spt, &spte->elem);
 	return spte;
 }
@@ -68,7 +69,10 @@ page_load(void *addr)
 		// case PAGE_FILE:
 		// 	page_load_file(spte);
 		case PAGE_SWAP:
-			page_swap_in(spte);
+			return page_swap_in(spte);
+		default:
+			return true;
+
 	}
 }
 
@@ -109,7 +113,9 @@ page_swap_in(struct sup_page_table_entry *spte)
 {
 	uint8_t *kpage = frame_allocate(PAL_USER, spte);
 	if(kpage == NULL)
+	{
 		return false;
+	}
 	
 	if(!install_page(spte->upage, kpage, true))
 	{

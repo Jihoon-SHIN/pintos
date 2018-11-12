@@ -186,12 +186,12 @@ page_fault (struct intr_frame *f)
 
   // printf("esp %x\n", esp);
   // printf("user %d\n", user);
-
   if(!check_stack_size && (check_push || fault_addr >=esp || check_pushA))
   {
     page_grow_stack(fault_addr);
-    return;
+    // return;
   }
+  
   load_success = page_load(fault_addr);
   if(load_success)
     return;
