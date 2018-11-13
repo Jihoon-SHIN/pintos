@@ -179,19 +179,19 @@ page_fault (struct intr_frame *f)
   bool check_push = (fault_addr==f->esp-4);
   bool check_pushA = (fault_addr==f->esp-32);
 
-
   // printf("fault_addr %x\n", fault_addr);
   // printf("f->esp %x\n", f->esp-32);
   // printf("f->esp %x\n", f->esp-4);
 
   // printf("esp %x\n", esp);
   // printf("user %d\n", user);
+  
   if(!check_stack_size && (check_push || fault_addr >=esp || check_pushA))
   {
     page_grow_stack(fault_addr);
     // return;
   }
-  
+
   load_success = page_load(fault_addr);
   if(load_success)
     return;

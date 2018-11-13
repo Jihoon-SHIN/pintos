@@ -22,12 +22,12 @@ page_grow_stack(void *addr)
 {
 	struct sup_page_table_entry *spte = malloc(sizeof(struct sup_page_table_entry));
 	bool success = false;
-	uint8_t *kpage = frame_allocate(PAL_USER | PAL_ZERO, spte);
 	spte->upage = pg_round_down(addr);
 	spte->type = PAGE_STACK;
 	spte->writable = true;
-	spte->kpage = kpage;
 
+	uint8_t *kpage = frame_allocate(PAL_USER | PAL_ZERO, spte);
+	
 	if (kpage != NULL) 
 	{
       success = install_page (spte->upage, kpage, true);
@@ -96,7 +96,6 @@ bool
 page_load_file(struct sup_page_table_entry *spte) 
 {  
   uint8_t *kpage = frame_allocate(PAL_USER, spte);
-  spte->kpage = kpage;
 
   /* Load this page. */
   if (file_read_at (spte->file, kpage, spte->page_read_bytes, spte->ofs) != (int) spte->page_read_bytes)

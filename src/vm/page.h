@@ -16,12 +16,12 @@ enum page_type
 	PAGE_STACK,
 	PAGE_FILE,
 	PAGE_SWAP,
+	PAGE_EXIT,
 };
 
 struct sup_page_table_entry
 {
 	void *upage;
-	void *kpage;
 	int type; 
 	bool writable;
 

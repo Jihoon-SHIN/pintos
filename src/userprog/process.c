@@ -71,6 +71,9 @@ start_process (void *f_name)
   struct intr_frame if_;
   bool success;
 
+  #ifdef VM
+  list_init(&thread_current()->spt);
+  #endif
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -141,7 +144,7 @@ process_exit (void)
 
   struct list_elem *e;
   struct list_elem *ee;
-
+  struct list_elem *e_spt;
   file_close(curr->file);
 
   // close_all_file
@@ -166,6 +169,19 @@ process_exit (void)
   {
     sema_up(&curr->child_p->sema_wait);
   }
+
+  #ifdef VM
+
+  for(e_spt=list_begin(&thread_current()->spt); e_spt != list_end(&thread_current()->spt) ; e_spt = list_next(e_spt))
+  {
+    struct sup_page_table_entry *spte = list_entry(e_spt, struct sup_page_table_entry, elem);
+    // spte->type = PAGE_EXIT;
+    e_spt = list_remove(&spte->elem)->prev;
+    frame_free(pagedir_get_page(thread_current()->pagedir, spte->upage));
+    pagedir_clear_page(thread_current()->pagedir, spte->upage);
+    free(spte);
+  }
+  #endif
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = curr->pagedir;
@@ -295,8 +311,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
   fn_copy = malloc(strlen(file_name)+1);
   strlcpy(fn_copy, file_name, strlen(file_name)+1);
   fn_copy = strtok_r(fn_copy, " ", &save_ptr);
+  lock_acquire(&filesys_lock);
   file = filesys_open (fn_copy);
-
+  lock_release(&filesys_lock);
   free(fn_copy);
   if (file == NULL) 
     {
@@ -490,11 +507,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
         return false;
 
       /* Load this page. */
+      lock_acquire(&filesys_lock);
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
           frame_free(kpage);
+          lock_release(&filesys_lock);
           return false; 
         }
+      lock_release(&filesys_lock);
       memset (kpage + page_read_bytes, 0, page_zero_bytes);
 
       /* Add the page to the process's address space. */
