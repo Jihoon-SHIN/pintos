@@ -65,17 +65,14 @@ frame_find(void *frame)
 {
 	struct list_elem* e;
 	struct frame_table_entry *fte;
-	// lock_acquire(&frame_table_lock);
 	for(e= list_begin(&frame_table_list) ; e != list_end(&frame_table_list) ; e = list_next(e))
 	{
 		fte = list_entry(e, struct frame_table_entry, elem);
 		if(fte->frame == frame)
 		{
-			// lock_release(&frame_table_lock);
 			return fte;
 		}
 	}
-	// lock_release(&frame_table_lock);
 	return NULL;
 }
 

@@ -27,7 +27,7 @@ page_grow_stack(void *addr)
 	spte->writable = true;
 
 	uint8_t *kpage = frame_allocate(PAL_USER | PAL_ZERO, spte);
-	
+
 	if (kpage != NULL) 
 	{
       success = install_page (spte->upage, kpage, true);
@@ -57,7 +57,6 @@ page_file(struct file *file, off_t ofs, uint8_t *upage, size_t page_read_bytes, 
 	return spte;
 }
 
-
 bool
 page_load(void *addr)
 {
@@ -66,8 +65,6 @@ page_load(void *addr)
 		return false;
 	switch(spte->type)
 	{
-		// case PAGE_FILE:
-		// 	page_load_file(spte);
 		case PAGE_SWAP:
 			return page_swap_in(spte);
 		default:

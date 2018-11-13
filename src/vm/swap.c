@@ -15,14 +15,8 @@ swap_init(void)
 size_t 
 swap_out (void *frame)
 {
-  // if (!swap_disk || !swap_bitmap)
-  // {
-  //     PANIC("Need swap partition but no swap partition present!");
-  // }
   lock_acquire(&swap_lock);
-
   size_t free_index = bitmap_scan_and_flip(swap_bitmap, 0, 1, SWAP_FREE);
-  
   size_t i;
   for (i = 0; i < SECTORS_PER_PAGE; i++)
   { 
@@ -35,15 +29,7 @@ swap_out (void *frame)
 void 
 swap_in (size_t used_index, void* frame)
 {
-  if (!swap_disk || !swap_bitmap)
-  {
-      return;
-  }
   lock_acquire(&swap_lock);
-  // if (bitmap_test(swap_bitmap, used_index) == SWAP_FREE)
-  // {
-  //     PANIC ("Trying to swap in a free block! Kernel panicking.");
-  // }
   bitmap_flip(swap_bitmap, used_index);
   size_t i;
   for (i = 0; i < SECTORS_PER_PAGE; i++)
