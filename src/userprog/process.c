@@ -502,27 +502,27 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       /* Get a page of memory. */
     #ifdef VM
       struct sup_page_table_entry *spte = page_file(file, ofs, upage, read_bytes, zero_bytes, writable);
-      uint8_t *kpage = frame_allocate(PAL_USER, spte);
-      if (kpage == NULL)
-        return false;
+      // uint8_t *kpage = frame_allocate(PAL_USER, spte);
+      // if (kpage == NULL)
+      //   return false;
 
-      /* Load this page. */
-      lock_acquire(&filesys_lock);
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
-        {
-          frame_free(kpage);
-          lock_release(&filesys_lock);
-          return false; 
-        }
-      lock_release(&filesys_lock);
-      memset (kpage + page_read_bytes, 0, page_zero_bytes);
+      // /* Load this page. */
+      // lock_acquire(&filesys_lock);
+      // if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
+      //   {
+      //     frame_free(kpage);
+      //     lock_release(&filesys_lock);
+      //     return false; 
+      //   }
+      // lock_release(&filesys_lock);
+      // memset (kpage + page_read_bytes, 0, page_zero_bytes);
 
-      /* Add the page to the process's address space. */
-      if (!install_page (upage, kpage, writable)) 
-        {
-          frame_free(kpage);
-          return false; 
-        }
+      // /* Add the page to the process's address space. */
+      // if (!install_page (upage, kpage, writable)) 
+      //   {
+      //     frame_free(kpage);
+      //     return false; 
+      //   }
     #else
       uint8_t *kpage = palloc_get_page (PAL_USER);
       if (kpage == NULL)

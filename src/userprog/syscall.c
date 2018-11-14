@@ -239,6 +239,20 @@ close(int fd)
 	free(fe);
 }
 
+#ifdef VM
+int
+mmap(int fd, void *addr)
+{
+	return 1;
+}
+
+void
+munmap(int mapping)
+{
+
+}
+#endif
+
 /* Syscall_handler */
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
@@ -314,5 +328,17 @@ syscall_handler (struct intr_frame *f UNUSED)
   		close(get_arg((int *)f->esp+1));
   		break;
   	}
+  	#ifdef VM
+  	case SYS_MMAP:
+  	{
+  		f->eax = mmap(get_arg((int *)f->esp+1), get_arg((int *)f->esp+2));
+  		break;
+  	}
+  	case SYS_MUNMAP:
+  	{
+  		munmap(get_arg((int *)f->esp+1));
+  		break;
+  	}
+  	#endif
   }
 }

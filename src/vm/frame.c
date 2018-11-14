@@ -86,7 +86,9 @@ evict_frame(void)
 	for(e=list_begin(&frame_table_list) ; e!=list_end(&frame_table_list) ; e = list_next(e))
 	{
 		fte = list_entry(e, struct frame_table_entry, elem);
-		if(fte->spte->type !=PAGE_STACK)
+		// if(fte->spte->type != PAGE_STACK_L && fte->spte->type != PAGE_STACK)
+		// {
+		if(fte->spte->type == PAGE_LOADED || fte->spte->type == PAGE_MMAP)
 		{
 		// if(pagedir_is_accessed(fte->thread->pagedir, fte->frame))
 		// {
@@ -101,6 +103,7 @@ evict_frame(void)
 			palloc_free_page(fte->frame);
 			free(fte);
 			break;
+			// }
 		}
 		// }		
 	}

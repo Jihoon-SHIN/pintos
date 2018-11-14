@@ -1,0 +1,19 @@
+			+---------------------------+
+			|		CS 330				|
+			| PROJECT 2: USER PROGRAMS	|
+			| 	   DESIGN DOCUMENT     	|
+			+---------------------------+
+
+---- GROUP ----
+
+>> Fill in the names and email addresses of your group members.
+
+신지훈 <jihoon9030@kaist.ac.kr>
+김태연 <ktyty7@kaist.ac.kr>
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for the
+>> TAs, or extra credit, please give them here.
+	
+	Token 2개 사용하겠습니다.

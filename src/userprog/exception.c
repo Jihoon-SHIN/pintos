@@ -189,12 +189,12 @@ page_fault (struct intr_frame *f)
   if(!check_stack_size && (check_push || fault_addr >=esp || check_pushA))
   {
     page_grow_stack(fault_addr);
-    // return;
   }
 
   load_success = page_load(fault_addr);
   if(load_success)
     return;
+  
 
   #endif
   f->eip = f->eax;

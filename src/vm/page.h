@@ -13,10 +13,13 @@
 
 enum page_type
 {
+	PAGE_STACK_L,
 	PAGE_STACK,
 	PAGE_FILE,
 	PAGE_SWAP,
 	PAGE_EXIT,
+	PAGE_LOADED,
+	PAGE_MMAP,
 };
 
 struct sup_page_table_entry
@@ -41,4 +44,5 @@ bool page_load(void *addr);
 struct sup_page_table_entry* find_page(void *addr);
 bool page_load_file(struct sup_page_table_entry *spte);
 bool page_swap_in(struct sup_page_table_entry *spte);
+bool page_load_stack(struct sup_page_table_entry *spte);
 #endif
