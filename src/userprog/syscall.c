@@ -6,9 +6,18 @@
 #include "threads/vaddr.h"
 #include "userprog/process.h"
 
+#ifdef VM
+#include "vm/page.h"
+#endif
+
 static void syscall_handler (struct intr_frame *);
 void exit(int status);
 
+
+#ifdef VM
+static int mmap_id = 1;
+static struct list mmap_list;
+#endif
 
 /* Init function */
 void
@@ -16,6 +25,9 @@ syscall_init (void)
 {
 	lock_init(&filesys_lock);
 	lock_init(&exec_exit_lock);
+	#ifdef VM
+	list_init(&mmap_list);
+	#endif
 	intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -243,13 +255,69 @@ close(int fd)
 int
 mmap(int fd, void *addr)
 {
-	return 1;
+	if(fd==0 || fd==1)
+		return -1;
+	
+	if(addr == 0 || pg_ofs(addr) !=0)
+		return -1;
+
+	int size = filesize(fd);
+
+	if(size==0)
+		return -1;
+
+	void *iter;
+	struct file_element *fe = find_file(fd);
+	struct mmap_table_entry *mte = malloc(sizeof(struct mmap_table_entry));
+
+
+	lock_acquire(&filesys_lock);
+	struct file *f = file_reopen(fe->file);
+	lock_release(&filesys_lock);
+	mte->file = f;
+	mte->mmap_id = mmap_id;
+	mte->base = addr;
+	mte->size = size;
+
+
+	uint32_t read_bytes = size;
+	int32_t ofs = 0;
+	while (read_bytes > 0) 
+	{
+		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+		size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+		bool success = page_mmap(mte, page_read_bytes, page_zero_bytes, ofs, true);
+
+		if(!success)
+		{
+			munmap(mte->mmap_id);
+			return -1;
+		}
+
+		read_bytes -= page_read_bytes;
+		addr += PGSIZE;
+		ofs += page_read_bytes;
+	}
+	
+	list_push_back(&mmap_list, &mte->elem);
+	mmap_id = mmap_id + 1;
+	return mte->mmap_id;
 }
 
 void
 munmap(int mapping)
 {
-
+	struct list_elem *e;
+	for(e = list_begin(&mmap_list); e != list_end(&mmap_list); e = list_next(e))
+	{
+		struct mmap_table_entry *mte = list_entry(e, struct mmap_table_entry, elem);
+		if(mte->mmap_id == mapping)
+		{
+			list_remove(&mte->elem);
+			free(mte);
+		}
+	}
 }
 #endif
 

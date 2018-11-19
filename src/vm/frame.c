@@ -26,10 +26,7 @@ frame_allocate(enum palloc_flags flags, struct sup_page_table_entry *spte)
 {	
 	uint8_t *kpage;
 	struct frame_table_entry *fte = malloc(sizeof(struct frame_table_entry));
-
-
 	kpage = palloc_get_page(flags);
-
 	if(kpage == NULL)
 	{
 		evict_frame();
