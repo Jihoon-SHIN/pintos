@@ -102,7 +102,7 @@ page_load(void *addr)
 		case PAGE_MMAP:
 			return page_load_mmap(spte);
 		default:
-			return true;
+			return false;
 
 	}
 }

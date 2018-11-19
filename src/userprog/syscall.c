@@ -316,6 +316,7 @@ munmap(int mapping)
 		{
 			list_remove(&mte->elem);
 			free(mte);
+			break;
 		}
 	}
 }
