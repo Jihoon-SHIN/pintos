@@ -110,6 +110,7 @@ struct thread
 #ifdef VM
     void* esp;
     struct list spt;
+    struct list mmap_list;
 #endif
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */

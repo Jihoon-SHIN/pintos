@@ -149,8 +149,10 @@ txq	src/devices/serial.c	/^static struct intq txq;$/;"	v	typeref:struct:intq	fil
 write_ier	src/devices/serial.c	/^write_ier (void) $/;"	f	file:
 DEVICES_SERIAL_H	src/devices/serial.h	/^#define DEVICES_SERIAL_H$/;"	d
 busy_wait	src/devices/timer.c	/^busy_wait (int64_t loops) $/;"	f	file:
+compare_wake	src/devices/timer.c	/^compare_wake(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED)$/;"	f	file:
 loops_per_tick	src/devices/timer.c	/^static unsigned loops_per_tick;$/;"	v	file:
 real_time_sleep	src/devices/timer.c	/^real_time_sleep (int64_t num, int32_t denom) $/;"	f	file:
+sleep_list	src/devices/timer.c	/^static struct list sleep_list;$/;"	v	typeref:struct:list	file:
 ticks	src/devices/timer.c	/^static int64_t ticks;$/;"	v	file:
 timer_calibrate	src/devices/timer.c	/^timer_calibrate (void) $/;"	f
 timer_elapsed	src/devices/timer.c	/^timer_elapsed (int64_t then) $/;"	f
@@ -163,6 +165,7 @@ timer_print_stats	src/devices/timer.c	/^timer_print_stats (void) $/;"	f
 timer_sleep	src/devices/timer.c	/^timer_sleep (int64_t ticks) $/;"	f
 timer_ticks	src/devices/timer.c	/^timer_ticks (void) $/;"	f
 timer_usleep	src/devices/timer.c	/^timer_usleep (int64_t us) $/;"	f
+timer_wakeup	src/devices/timer.c	/^timer_wakeup(void)$/;"	f
 too_many_loops	src/devices/timer.c	/^too_many_loops (unsigned loops) $/;"	f	file:
 DEVICES_TIMER_H	src/devices/timer.h	/^#define DEVICES_TIMER_H$/;"	d
 TIMER_FREQ	src/devices/timer.h	/^#define TIMER_FREQ /;"	d
@@ -1076,7 +1079,6 @@ test_alarm_single	src/tests/threads/alarm-wait.c	/^test_alarm_single (void) $/;"
 test_sleep	src/tests/threads/alarm-wait.c	/^test_sleep (int thread_cnt, int iterations) $/;"	f	file:
 test_alarm_zero	src/tests/threads/alarm-zero.c	/^test_alarm_zero (void) $/;"	f
 check_alarm	src/tests/threads/alarm.pm	/^sub check_alarm {$/;"	s
-test_hello	src/tests/threads/hello.c	/^test_hello(void)$/;"	f
 block_thread	src/tests/threads/mlfqs-block.c	/^block_thread (void *lock_) $/;"	f	file:
 test_mlfqs_block	src/tests/threads/mlfqs-block.c	/^test_mlfqs_block (void) $/;"	f
 MAX_THREAD_CNT	src/tests/threads/mlfqs-fair.c	/^#define MAX_THREAD_CNT /;"	d	file:
@@ -1564,16 +1566,22 @@ esi	src/threads/switch.h	/^    uint32_t esi;               \/*  4: Saved %esi. *
 next	src/threads/switch.h	/^    struct thread *next;        \/* 24: switch_threads()'s NEXT argument. *\/$/;"	m	struct:switch_threads_frame	typeref:struct:switch_threads_frame::thread
 switch_entry_frame	src/threads/switch.h	/^struct switch_entry_frame$/;"	s
 switch_threads_frame	src/threads/switch.h	/^struct switch_threads_frame $/;"	s
+compare_priority	src/threads/synch.c	/^compare_priority(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED)$/;"	f
 cond_broadcast	src/threads/synch.c	/^cond_broadcast (struct condition *cond, struct lock *lock) $/;"	f
 cond_init	src/threads/synch.c	/^cond_init (struct condition *cond)$/;"	f
 cond_signal	src/threads/synch.c	/^cond_signal (struct condition *cond, struct lock *lock UNUSED) $/;"	f
 cond_wait	src/threads/synch.c	/^cond_wait (struct condition *cond, struct lock *lock) $/;"	f
 elem	src/threads/synch.c	/^    struct list_elem elem;              \/* List element. *\/$/;"	m	struct:semaphore_elem	typeref:struct:semaphore_elem::list_elem	file:
+highPriority_cond	src/threads/synch.c	/^highPriority_cond(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED)$/;"	f	file:
+highPriority_lock	src/threads/synch.c	/^highPriority_lock(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED)$/;"	f	file:
 lock_acquire	src/threads/synch.c	/^lock_acquire (struct lock *lock)$/;"	f
 lock_held_by_current_thread	src/threads/synch.c	/^lock_held_by_current_thread (const struct lock *lock) $/;"	f
 lock_init	src/threads/synch.c	/^lock_init (struct lock *lock)$/;"	f
 lock_release	src/threads/synch.c	/^lock_release (struct lock *lock) $/;"	f
 lock_try_acquire	src/threads/synch.c	/^lock_try_acquire (struct lock *lock)$/;"	f
+priority	src/threads/synch.c	/^    int priority;$/;"	m	struct:semaphore_elem	file:
+priority_back	src/threads/synch.c	/^priority_back(struct lock *lock)$/;"	f
+priority_donation	src/threads/synch.c	/^priority_donation(struct lock *lock)$/;"	f
 sema_down	src/threads/synch.c	/^sema_down (struct semaphore *sema) $/;"	f
 sema_init	src/threads/synch.c	/^sema_init (struct semaphore *sema, unsigned value) $/;"	f
 sema_self_test	src/threads/synch.c	/^sema_self_test (void) $/;"	f
@@ -1585,6 +1593,7 @@ semaphore_elem	src/threads/synch.c	/^struct semaphore_elem $/;"	s	file:
 THREADS_SYNCH_H	src/threads/synch.h	/^#define THREADS_SYNCH_H$/;"	d
 barrier	src/threads/synch.h	/^#define barrier(/;"	d
 condition	src/threads/synch.h	/^struct condition $/;"	s
+elem	src/threads/synch.h	/^    struct list_elem elem;      \/* List element *\/$/;"	m	struct:lock	typeref:struct:lock::list_elem
 holder	src/threads/synch.h	/^    struct thread *holder;      \/* Thread holding lock (for debugging). *\/$/;"	m	struct:lock	typeref:struct:lock::thread
 lock	src/threads/synch.h	/^struct lock $/;"	s
 semaphore	src/threads/synch.h	/^    struct semaphore semaphore; \/* Binary semaphore controlling access. *\/$/;"	m	struct:lock	typeref:struct:lock::semaphore
@@ -1595,10 +1604,12 @@ waiters	src/threads/synch.h	/^    struct list waiters;        \/* List of waitin
 THREAD_BASIC	src/threads/thread.c	/^#define THREAD_BASIC /;"	d	file:
 THREAD_MAGIC	src/threads/thread.c	/^#define THREAD_MAGIC /;"	d	file:
 TIME_SLICE	src/threads/thread.c	/^#define TIME_SLICE /;"	d	file:
+all_list	src/threads/thread.c	/^static struct list all_list;$/;"	v	typeref:struct:list	file:
 alloc_frame	src/threads/thread.c	/^alloc_frame (struct thread *t, size_t size) $/;"	f	file:
 allocate_tid	src/threads/thread.c	/^allocate_tid (void) $/;"	f	file:
 aux	src/threads/thread.c	/^    void *aux;                  \/* Auxiliary data for function. *\/$/;"	m	struct:kernel_thread_frame	file:
 eip	src/threads/thread.c	/^    void *eip;                  \/* Return address. *\/$/;"	m	struct:kernel_thread_frame	file:
+find_parent_thread	src/threads/thread.c	/^bool find_parent_thread(int parent_pid)$/;"	f
 function	src/threads/thread.c	/^    thread_func *function;      \/* Function to call. *\/$/;"	m	struct:kernel_thread_frame	file:
 idle	src/threads/thread.c	/^idle (void *idle_started_ UNUSED) $/;"	f	file:
 idle_thread	src/threads/thread.c	/^static struct thread *idle_thread;$/;"	v	typeref:struct:thread	file:
@@ -1609,6 +1620,7 @@ is_thread	src/threads/thread.c	/^is_thread (struct thread *t)$/;"	f	file:
 kernel_thread	src/threads/thread.c	/^kernel_thread (thread_func *function, void *aux) $/;"	f	file:
 kernel_thread_frame	src/threads/thread.c	/^struct kernel_thread_frame $/;"	s	file:
 kernel_ticks	src/threads/thread.c	/^static long long kernel_ticks;  \/* # of timer ticks in kernel threads. *\/$/;"	v	file:
+less_priority	src/threads/thread.c	/^less_priority(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED)$/;"	f	file:
 next_thread_to_run	src/threads/thread.c	/^next_thread_to_run (void) $/;"	f	file:
 ready_list	src/threads/thread.c	/^static struct list ready_list;$/;"	v	typeref:struct:list	file:
 running_thread	src/threads/thread.c	/^running_thread (void) $/;"	f
@@ -1646,11 +1658,23 @@ THREAD_DYING	src/threads/thread.h	/^    THREAD_DYING        \/* About to be dest
 THREAD_READY	src/threads/thread.h	/^    THREAD_READY,       \/* Not running but ready to run. *\/$/;"	e	enum:thread_status
 THREAD_RUNNING	src/threads/thread.h	/^    THREAD_RUNNING,     \/* Running thread. *\/$/;"	e	enum:thread_status
 TID_ERROR	src/threads/thread.h	/^#define TID_ERROR /;"	d
+allelem	src/threads/thread.h	/^    struct list_elem allelem;          \/* To store all thread *\/$/;"	m	struct:thread	typeref:struct:thread::list_elem
+child_list	src/threads/thread.h	/^    struct list child_list;$/;"	m	struct:thread	typeref:struct:thread::list
+child_p	src/threads/thread.h	/^    struct child_process *child_p;$/;"	m	struct:thread	typeref:struct:thread::child_process
+donate_count	src/threads/thread.h	/^    int donate_count;                   \/* Counting the donation count *\/$/;"	m	struct:thread
 elem	src/threads/thread.h	/^    struct list_elem elem;              \/* List element. *\/$/;"	m	struct:thread	typeref:struct:thread::list_elem
+esp	src/threads/thread.h	/^    void* esp;$/;"	m	struct:thread
+fd	src/threads/thread.h	/^    int fd;                             \/* file descriptor *\/$/;"	m	struct:thread
+file	src/threads/thread.h	/^    struct file *file;$/;"	m	struct:thread	typeref:struct:thread::file
+file_list	src/threads/thread.h	/^    struct list file_list;$/;"	m	struct:thread	typeref:struct:thread::list
+lock_list	src/threads/thread.h	/^    struct list lock_list;              \/* List of lock *\/$/;"	m	struct:thread	typeref:struct:thread::list
 magic	src/threads/thread.h	/^    unsigned magic;                     \/* Detects stack overflow. *\/$/;"	m	struct:thread
+mmap_list	src/threads/thread.h	/^    struct list mmap_list;$/;"	m	struct:thread	typeref:struct:thread::list
 name	src/threads/thread.h	/^    char name[16];                      \/* Name (for debugging purposes). *\/$/;"	m	struct:thread
+original_priority	src/threads/thread.h	/^    int original_priority;              \/* Original Prioirty before donated *\/$/;"	m	struct:thread
 pagedir	src/threads/thread.h	/^    uint32_t *pagedir;                  \/* Page directory. *\/$/;"	m	struct:thread
 priority	src/threads/thread.h	/^    int priority;                       \/* Priority. *\/$/;"	m	struct:thread
+spt	src/threads/thread.h	/^    struct list spt;$/;"	m	struct:thread	typeref:struct:thread::list
 stack	src/threads/thread.h	/^    uint8_t *stack;                     \/* Saved stack pointer. *\/$/;"	m	struct:thread
 status	src/threads/thread.h	/^    enum thread_status status;          \/* Thread state. *\/$/;"	m	struct:thread	typeref:enum:thread::thread_status
 thread	src/threads/thread.h	/^struct thread$/;"	s
@@ -1658,6 +1682,8 @@ thread_func	src/threads/thread.h	/^typedef void thread_func (void *aux);$/;"	t
 thread_status	src/threads/thread.h	/^enum thread_status$/;"	g
 tid	src/threads/thread.h	/^    tid_t tid;                          \/* Thread identifier. *\/$/;"	m	struct:thread
 tid_t	src/threads/thread.h	/^typedef int tid_t;$/;"	t
+try_lock	src/threads/thread.h	/^    struct lock *try_lock;              \/* Try to acquire lock *\/$/;"	m	struct:thread	typeref:struct:thread::lock
+wakeup_time	src/threads/thread.h	/^    int64_t wakeup_time;                \/* wakeup time of thread *\/$/;"	m	struct:thread
 BITMASK	src/threads/vaddr.h	/^#define BITMASK(/;"	d
 PGBITS	src/threads/vaddr.h	/^#define PGBITS /;"	d
 PGMASK	src/threads/vaddr.h	/^#define PGMASK /;"	d
@@ -1736,6 +1762,8 @@ PT_NULL	src/userprog/process.c	/^#define PT_NULL /;"	d	file:
 PT_PHDR	src/userprog/process.c	/^#define PT_PHDR /;"	d	file:
 PT_SHLIB	src/userprog/process.c	/^#define PT_SHLIB /;"	d	file:
 PT_STACK	src/userprog/process.c	/^#define PT_STACK /;"	d	file:
+argument_passing	src/userprog/process.c	/^argument_passing(void **esp, char *argument_line)$/;"	f
+close_all_file	src/userprog/process.c	/^close_all_file(void)$/;"	f
 e_ehsize	src/userprog/process.c	/^    Elf32_Half    e_ehsize;$/;"	m	struct:Elf32_Ehdr	file:
 e_entry	src/userprog/process.c	/^    Elf32_Addr    e_entry;$/;"	m	struct:Elf32_Ehdr	file:
 e_flags	src/userprog/process.c	/^    Elf32_Word    e_flags;$/;"	m	struct:Elf32_Ehdr	file:
@@ -1750,7 +1778,9 @@ e_shoff	src/userprog/process.c	/^    Elf32_Off     e_shoff;$/;"	m	struct:Elf32_E
 e_shstrndx	src/userprog/process.c	/^    Elf32_Half    e_shstrndx;$/;"	m	struct:Elf32_Ehdr	file:
 e_type	src/userprog/process.c	/^    Elf32_Half    e_type;$/;"	m	struct:Elf32_Ehdr	file:
 e_version	src/userprog/process.c	/^    Elf32_Word    e_version;$/;"	m	struct:Elf32_Ehdr	file:
-install_page	src/userprog/process.c	/^install_page (void *upage, void *kpage, bool writable)$/;"	f	file:
+find_child_process	src/userprog/process.c	/^find_child_process(tid_t child_tid)$/;"	f
+find_file	src/userprog/process.c	/^find_file(int fd)$/;"	f
+install_page	src/userprog/process.c	/^install_page (void *upage, void *kpage, bool writable)$/;"	f
 load	src/userprog/process.c	/^load (const char *file_name, void (**eip) (void), void **esp) $/;"	f
 load_segment	src/userprog/process.c	/^load_segment (struct file *file, off_t ofs, uint8_t *upage,$/;"	f	file:
 p_align	src/userprog/process.c	/^    Elf32_Word p_align;$/;"	m	struct:Elf32_Phdr	file:
@@ -1765,13 +1795,47 @@ process_activate	src/userprog/process.c	/^process_activate (void)$/;"	f
 process_execute	src/userprog/process.c	/^process_execute (const char *file_name) $/;"	f
 process_exit	src/userprog/process.c	/^process_exit (void)$/;"	f
 process_wait	src/userprog/process.c	/^process_wait (tid_t child_tid UNUSED) $/;"	f
-setup_stack	src/userprog/process.c	/^setup_stack (void **esp) $/;"	f	file:
+setup_stack	src/userprog/process.c	/^setup_stack (void **esp, char *argument_line) $/;"	f	file:
 start_process	src/userprog/process.c	/^start_process (void *f_name)$/;"	f	file:
 validate_segment	src/userprog/process.c	/^validate_segment (const struct Elf32_Phdr *phdr, struct file *file) $/;"	f	file:
 USERPROG_PROCESS_H	src/userprog/process.h	/^#define USERPROG_PROCESS_H$/;"	d
+child_process	src/userprog/process.h	/^struct child_process$/;"	s
+elem	src/userprog/process.h	/^	struct list_elem elem;			\/* To use list *\/$/;"	m	struct:file_element	typeref:struct:file_element::list_elem
+elem	src/userprog/process.h	/^ 	struct list_elem elem;			\/* To use list *\/$/;"	m	struct:child_process	typeref:struct:child_process::list_elem
+fd	src/userprog/process.h	/^	int fd;							\/* File descriptor *\/$/;"	m	struct:file_element
+file	src/userprog/process.h	/^	struct file *file;				\/* file struct *\/$/;"	m	struct:file_element	typeref:struct:file_element::file
+file_element	src/userprog/process.h	/^struct file_element$/;"	s
+load	src/userprog/process.h	/^	int load;             			\/* Checking the load. 0 1 *\/$/;"	m	struct:child_process
+parent_pid	src/userprog/process.h	/^	int parent_pid;       			\/* pid foe parent *\/$/;"	m	struct:child_process
+pid	src/userprog/process.h	/^	int pid;              			\/* pid for child *\/$/;"	m	struct:child_process
+sema_load	src/userprog/process.h	/^ 	struct semaphore sema_load; 	\/* Sema for exec <-> load *\/$/;"	m	struct:child_process	typeref:struct:child_process::semaphore
+sema_wait	src/userprog/process.h	/^	struct semaphore sema_wait;  	\/* Sema for wait <-> exit *\/$/;"	m	struct:child_process	typeref:struct:child_process::semaphore
+status	src/userprog/process.h	/^	int status;           	 		\/* child status, which is used exit status *\/$/;"	m	struct:child_process
+close	src/userprog/syscall.c	/^close(int fd)$/;"	f
+create	src/userprog/syscall.c	/^bool create(const char *file, unsigned initial_size)$/;"	f
+exec	src/userprog/syscall.c	/^int exec(const char *cmd_line)$/;"	f
+exit	src/userprog/syscall.c	/^void exit(int status)$/;"	f
+filesize	src/userprog/syscall.c	/^filesize(int fd)$/;"	f
+get_arg	src/userprog/syscall.c	/^get_arg(const uint8_t *uaddr)$/;"	f	file:
+get_user	src/userprog/syscall.c	/^get_user (const uint8_t *uaddr)$/;"	f	file:
+halt	src/userprog/syscall.c	/^void halt(void)$/;"	f
+mmap	src/userprog/syscall.c	/^mmap(int fd, void *addr)$/;"	f
+mmap_id	src/userprog/syscall.c	/^static int mmap_id = 1;$/;"	v	file:
+munmap	src/userprog/syscall.c	/^munmap(int mapping)$/;"	f
+open	src/userprog/syscall.c	/^open(const char *file)$/;"	f
+put_user	src/userprog/syscall.c	/^put_user (uint8_t *udst, uint8_t byte)$/;"	f	file:
+read	src/userprog/syscall.c	/^read(int fd, void *buffer, unsigned size)$/;"	f
+remove	src/userprog/syscall.c	/^remove(const char *file)$/;"	f
+seek	src/userprog/syscall.c	/^seek(int fd, unsigned position)$/;"	f
 syscall_handler	src/userprog/syscall.c	/^syscall_handler (struct intr_frame *f UNUSED) $/;"	f	file:
 syscall_init	src/userprog/syscall.c	/^syscall_init (void) $/;"	f
+tell	src/userprog/syscall.c	/^tell(int fd)$/;"	f
+wait	src/userprog/syscall.c	/^int wait(int pid)$/;"	f
+write	src/userprog/syscall.c	/^write(int fd, void *buffer, unsigned size)$/;"	f
+BOTTOM_USER_VADDR	src/userprog/syscall.h	/^#define BOTTOM_USER_VADDR /;"	d
 USERPROG_SYSCALL_H	src/userprog/syscall.h	/^#define USERPROG_SYSCALL_H$/;"	d
+exec_exit_lock	src/userprog/syscall.h	/^struct lock exec_exit_lock;	\/* Synchronizaion of exec and exit *\/$/;"	v	typeref:struct:lock
+filesys_lock	src/userprog/syscall.h	/^struct lock filesys_lock;	\/* filesys lock. filesys can execute one by one *\/$/;"	v	typeref:struct:lock
 back_link	src/userprog/tss.c	/^    uint16_t back_link, :16;$/;"	m	struct:tss	file:
 bitmap	src/userprog/tss.c	/^    uint16_t trace, bitmap;$/;"	m	struct:tss	file:
 cr3	src/userprog/tss.c	/^    uint32_t cr3;$/;"	m	struct:tss	file:
@@ -1876,3 +1940,62 @@ make_nonblocking	src/utils/squish-unix.c	/^make_nonblocking (int fd, bool nonblo
 make_noncanon	src/utils/squish-unix.c	/^make_noncanon (int fd, int vmin, int vtime)$/;"	f	file:
 relay	src/utils/squish-unix.c	/^relay (int sock) $/;"	f	file:
 sigchld_handler	src/utils/squish-unix.c	/^sigchld_handler (int signo __attribute__ ((unused))) $/;"	f	file:
+evict_frame	src/vm/frame.c	/^evict_frame(void)$/;"	f
+frame_allocate	src/vm/frame.c	/^frame_allocate(enum palloc_flags flags, struct sup_page_table_entry *spte)$/;"	f
+frame_find	src/vm/frame.c	/^frame_find(void *frame)$/;"	f
+frame_free	src/vm/frame.c	/^frame_free(void *frame)$/;"	f
+frame_init	src/vm/frame.c	/^frame_init(void)$/;"	f
+frame_table_list	src/vm/frame.c	/^static struct list frame_table_list;$/;"	v	typeref:struct:list	file:
+frame_table_lock	src/vm/frame.c	/^static struct lock frame_table_lock;$/;"	v	typeref:struct:lock	file:
+VM_FRAME_H	src/vm/frame.h	/^#define VM_FRAME_H$/;"	d
+elem	src/vm/frame.h	/^	struct list_elem elem;$/;"	m	struct:frame_table_entry	typeref:struct:frame_table_entry::list_elem
+frame	src/vm/frame.h	/^	void* frame;$/;"	m	struct:frame_table_entry
+frame_table_entry	src/vm/frame.h	/^struct frame_table_entry$/;"	s
+spte	src/vm/frame.h	/^	struct sup_page_table_entry *spte;$/;"	m	struct:frame_table_entry	typeref:struct:frame_table_entry::sup_page_table_entry
+thread	src/vm/frame.h	/^	struct thread *thread;$/;"	m	struct:frame_table_entry	typeref:struct:frame_table_entry::thread
+find_page	src/vm/page.c	/^find_page(void *addr)$/;"	f
+find_page2	src/vm/page.c	/^find_page2(void *addr)$/;"	f
+page_file	src/vm/page.c	/^page_file(struct file *file, off_t ofs, uint8_t *upage, size_t page_read_bytes, size_t page_zero_bytes, bool writable)$/;"	f
+page_grow_stack	src/vm/page.c	/^page_grow_stack(void *addr)$/;"	f
+page_load	src/vm/page.c	/^page_load(void *addr)$/;"	f
+page_load_file	src/vm/page.c	/^page_load_file(struct sup_page_table_entry *spte) $/;"	f
+page_load_mmap	src/vm/page.c	/^page_load_mmap(struct sup_page_table_entry *spte)$/;"	f
+page_load_stack	src/vm/page.c	/^page_load_stack(struct sup_page_table_entry *spte)$/;"	f
+page_mmap	src/vm/page.c	/^page_mmap(struct mmap_table_entry * mte, size_t page_read_bytes, size_t page_zero_bytes, off_t ofs, bool writable)$/;"	f
+page_swap_in	src/vm/page.c	/^page_swap_in(struct sup_page_table_entry *spte)$/;"	f
+PAGE_EXIT	src/vm/page.h	/^	PAGE_EXIT,$/;"	e	enum:page_type
+PAGE_FILE	src/vm/page.h	/^	PAGE_FILE,$/;"	e	enum:page_type
+PAGE_LOADED	src/vm/page.h	/^	PAGE_LOADED,$/;"	e	enum:page_type
+PAGE_MMAP	src/vm/page.h	/^	PAGE_MMAP,$/;"	e	enum:page_type
+PAGE_STACK	src/vm/page.h	/^	PAGE_STACK,$/;"	e	enum:page_type
+PAGE_STACK_L	src/vm/page.h	/^	PAGE_STACK_L,$/;"	e	enum:page_type
+PAGE_SWAP	src/vm/page.h	/^	PAGE_SWAP,$/;"	e	enum:page_type
+VM_PAGE_H	src/vm/page.h	/^#define VM_PAGE_H$/;"	d
+base	src/vm/page.h	/^	void* base;$/;"	m	struct:mmap_table_entry
+elem	src/vm/page.h	/^	struct list_elem elem;$/;"	m	struct:mmap_table_entry	typeref:struct:mmap_table_entry::list_elem
+elem	src/vm/page.h	/^	struct list_elem elem;$/;"	m	struct:sup_page_table_entry	typeref:struct:sup_page_table_entry::list_elem
+file	src/vm/page.h	/^	struct file *file;$/;"	m	struct:mmap_table_entry	typeref:struct:mmap_table_entry::file
+file	src/vm/page.h	/^	struct file *file;$/;"	m	struct:sup_page_table_entry	typeref:struct:sup_page_table_entry::file
+mmap_id	src/vm/page.h	/^	int mmap_id;$/;"	m	struct:mmap_table_entry
+mmap_table_entry	src/vm/page.h	/^struct mmap_table_entry$/;"	s
+mte	src/vm/page.h	/^	struct mmap_table_entry *mte;$/;"	m	struct:sup_page_table_entry	typeref:struct:sup_page_table_entry::mmap_table_entry
+ofs	src/vm/page.h	/^	off_t ofs;$/;"	m	struct:sup_page_table_entry
+page_read_bytes	src/vm/page.h	/^	size_t page_read_bytes;$/;"	m	struct:sup_page_table_entry
+page_type	src/vm/page.h	/^enum page_type$/;"	g
+page_zero_bytes	src/vm/page.h	/^	size_t page_zero_bytes;$/;"	m	struct:sup_page_table_entry
+size	src/vm/page.h	/^	int size;$/;"	m	struct:mmap_table_entry
+sup_page_table_entry	src/vm/page.h	/^struct sup_page_table_entry$/;"	s
+swap_index	src/vm/page.h	/^	int swap_index;$/;"	m	struct:sup_page_table_entry
+type	src/vm/page.h	/^	int type; $/;"	m	struct:sup_page_table_entry
+upage	src/vm/page.h	/^	void *upage;$/;"	m	struct:sup_page_table_entry
+writable	src/vm/page.h	/^	bool writable;$/;"	m	struct:sup_page_table_entry
+SWAP_FREE	src/vm/swap.c	/^#define SWAP_FREE /;"	d	file:
+SWAP_IN_USE	src/vm/swap.c	/^#define SWAP_IN_USE /;"	d	file:
+swap_in	src/vm/swap.c	/^swap_in (size_t used_index, void* frame)$/;"	f
+swap_init	src/vm/swap.c	/^swap_init(void)$/;"	f
+swap_out	src/vm/swap.c	/^swap_out (void *frame)$/;"	f
+SECTORS_PER_PAGE	src/vm/swap.h	/^#define SECTORS_PER_PAGE /;"	d
+VM_SWAP_H	src/vm/swap.h	/^#define VM_SWAP_H$/;"	d
+swap_bitmap	src/vm/swap.h	/^struct bitmap* swap_bitmap;$/;"	v	typeref:struct:bitmap
+swap_disk	src/vm/swap.h	/^struct disk* swap_disk;$/;"	v	typeref:struct:disk
+swap_lock	src/vm/swap.h	/^struct lock swap_lock;$/;"	v	typeref:struct:lock

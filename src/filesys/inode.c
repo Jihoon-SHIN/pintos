@@ -147,6 +147,7 @@ inode_reopen (struct inode *inode)
 {
   if (inode != NULL)
     inode->open_cnt++;
+
   return inode;
 }
 

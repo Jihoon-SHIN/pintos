@@ -37,6 +37,7 @@ page_grow_stack(void *addr)
  //        frame_free(kpage);
  //      }
 	// }
+
 	list_push_back(&thread_current()->spt, &spte->elem);
 }
 
@@ -53,17 +54,23 @@ page_file(struct file *file, off_t ofs, uint8_t *upage, size_t page_read_bytes, 
 	spte->writable = writable;
 	spte->type = PAGE_FILE;
 	// spte->type = PAGE_LOADED;
-	
+
+	// if(find_page2(spte->upage))
+	// {
+	// 	free(spte);
+	// 	return NULL;
+	// }
+
 	list_push_back(&thread_current()->spt, &spte->elem);
 	return spte;
 }
 
 bool
-page_mmap(struct mmap_table_entry * mte, size_t page_read_bytes, size_t page_zero_bytes, off_t ofs, bool writable)
+page_mmap(struct mmap_table_entry * mte, size_t page_read_bytes, size_t page_zero_bytes, off_t ofs, bool writable, uint8_t *upage)
 {
 	struct sup_page_table_entry *spte = malloc(sizeof(struct sup_page_table_entry));
 
-	spte->upage = mte->base;
+	spte->upage = upage;
 	spte->file = mte->file;
 	spte->mte = mte;
 	spte->type = PAGE_MMAP;
@@ -216,12 +223,6 @@ page_load_mmap(struct sup_page_table_entry *spte)
 	if (file_read_at (spte->file, kpage, spte->page_read_bytes, spte->ofs) != (int) spte->page_read_bytes)
 		ASSERT(0);
 
-  // lock_release(&filesys_lock);
-
-
-  // if(spte->page_read_bytes > 0)
-  // memset (kpage + spte->page_read_bytes, 0, spte->page_zero_bytes);
-	spte->type = PAGE_LOADED;
 	if (kpage != NULL) 
 	{
 		success = install_page (spte->upage, kpage, spte->writable);
@@ -232,5 +233,6 @@ page_load_mmap(struct sup_page_table_entry *spte)
 			return success;
 		}
 	}
+	spte->type = PAGE_LOADED;
 	return success;
 }

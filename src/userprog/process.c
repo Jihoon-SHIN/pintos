@@ -145,8 +145,13 @@ process_exit (void)
   struct list_elem *e;
   struct list_elem *ee;
   struct list_elem *e_spt;
-  file_close(curr->file);
+  struct list_elem *e_mte;
 
+  // lock_acquire(&filesys_lock);
+  // #ifdef USERPROG
+  file_close(curr->file);
+  // #endif
+  // lock_release(&filesys_lock);
   // close_all_file
   for(ee=list_begin(&curr->file_list); ee!= list_end(&curr->file_list); ee= list_next(ee))
   {
@@ -172,6 +177,13 @@ process_exit (void)
 
   #ifdef VM
 
+  for(e_mte= list_begin(&thread_current()->mmap_list); e_mte != list_end(&thread_current()->mmap_list) ; e_mte = list_next(e_mte))
+  {
+    struct mmap_table_entry *mte = list_entry(e_mte, struct mmap_table_entry, elem);
+    munmap(mte->mmap_id);
+  }
+
+
   for(e_spt=list_begin(&thread_current()->spt); e_spt != list_end(&thread_current()->spt) ; e_spt = list_next(e_spt))
   {
     struct sup_page_table_entry *spte = list_entry(e_spt, struct sup_page_table_entry, elem);
@@ -181,6 +193,9 @@ process_exit (void)
     pagedir_clear_page(thread_current()->pagedir, spte->upage);
     free(spte);
   }
+
+  
+
   #endif
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

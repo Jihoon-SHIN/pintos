@@ -45,6 +45,7 @@ struct mmap_table_entry
 	int mmap_id;
 	void* base;
 	int size;
+	int fd;
 	struct list_elem elem;
 };
 
@@ -57,5 +58,5 @@ bool page_load_file(struct sup_page_table_entry *spte);
 bool page_swap_in(struct sup_page_table_entry *spte);
 bool page_load_stack(struct sup_page_table_entry *spte);
 bool page_load_mmap(struct sup_page_table_entry *spte);
-bool page_mmap(struct mmap_table_entry * mte, size_t page_read_bytes, size_t page_zero_bytes, off_t ofs, bool writable);
+bool page_mmap(struct mmap_table_entry * mte, size_t page_read_bytes, size_t page_zero_bytes, off_t ofs, bool writable, uint8_t *upage);
 #endif

@@ -16,7 +16,6 @@ void exit(int status);
 
 #ifdef VM
 static int mmap_id = 1;
-static struct list mmap_list;
 #endif
 
 /* Init function */
@@ -25,9 +24,6 @@ syscall_init (void)
 {
 	lock_init(&filesys_lock);
 	lock_init(&exec_exit_lock);
-	#ifdef VM
-	list_init(&mmap_list);
-	#endif
 	intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -261,33 +257,44 @@ mmap(int fd, void *addr)
 	if(addr == 0 || pg_ofs(addr) !=0)
 		return -1;
 
-	int size = filesize(fd);
+	if((uint32_t)addr & PGSIZE != 0)
+		return -1;
 
-	if(size==0)
+	if(!is_user_vaddr(addr) || addr < BOTTOM_USER_VADDR)
+		return -1;
+	// int size = filesize(fd);
+	// if(size==0)
+	// 	return -1;
+	struct file_element *fe = find_file(fd);
+	if(fe==NULL) return -1;
+
+	// lock_acquire(&filesys_lock);
+	struct file *f = file_reopen(fe->file);
+	// lock_release(&filesys_lock);
+	if(f== NULL || file_length(f) == 0)
 		return -1;
 
 	void *iter;
-	struct file_element *fe = find_file(fd);
 	struct mmap_table_entry *mte = malloc(sizeof(struct mmap_table_entry));
 
 
-	lock_acquire(&filesys_lock);
-	struct file *f = file_reopen(fe->file);
-	lock_release(&filesys_lock);
+	// lock_acquire(&filesys_lock);
+	// struct file *f = file_reopen(fe->file);
+	// lock_release(&filesys_lock);
 	mte->file = f;
 	mte->mmap_id = mmap_id;
 	mte->base = addr;
-	mte->size = size;
+	mte->size = file_length(f);
+	mte->fd = fd;
 
-
-	uint32_t read_bytes = size;
+	uint32_t read_bytes = file_length(f);
 	int32_t ofs = 0;
 	while (read_bytes > 0) 
 	{
 		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-		bool success = page_mmap(mte, page_read_bytes, page_zero_bytes, ofs, true);
+		bool success = page_mmap(mte, page_read_bytes, page_zero_bytes, ofs, true, addr);
 
 		if(!success)
 		{
@@ -300,7 +307,7 @@ mmap(int fd, void *addr)
 		ofs += page_read_bytes;
 	}
 	
-	list_push_back(&mmap_list, &mte->elem);
+	list_push_back(&thread_current()->mmap_list, &mte->elem);
 	mmap_id = mmap_id + 1;
 	return mte->mmap_id;
 }
@@ -309,16 +316,42 @@ void
 munmap(int mapping)
 {
 	struct list_elem *e;
-	for(e = list_begin(&mmap_list); e != list_end(&mmap_list); e = list_next(e))
+	struct mmap_table_entry *mte;
+	for(e = list_begin(&thread_current()->mmap_list); e != list_end(&thread_current()->mmap_list); e = list_next(e))
 	{
-		struct mmap_table_entry *mte = list_entry(e, struct mmap_table_entry, elem);
-		if(mte->mmap_id == mapping)
+		mte = list_entry(e, struct mmap_table_entry, elem);
+		if(mte->mmap_id == mapping) break;
+	}
+	
+	// ASSERT(mte->mmap_id == mapping);
+	if(mte->mmap_id != mapping)
+		return;
+	void *addr;
+
+	for(addr=mte->base; addr < mte->base + mte->size ; addr += PGSIZE)
+	{
+		struct sup_page_table_entry *spte = find_page(addr);
+		if(spte != NULL)
 		{
-			list_remove(&mte->elem);
-			free(mte);
-			break;
+			if(pagedir_is_dirty(thread_current()->pagedir, addr))
+			{
+				lock_acquire(&filesys_lock);
+				int read_bytes = file_write_at(spte->file, spte->upage, spte->page_read_bytes, spte->ofs);
+				lock_release(&filesys_lock);
+				ASSERT(read_bytes == (int) spte->page_read_bytes);
+				frame_free(addr);
+			}
+			list_remove(&spte->elem);
+			free(spte);
 		}
 	}
+
+	// // lock_acquire(&filesys_lock);
+	// file_close(mte->file);
+	// // lock_release(&filesys_lock);
+	// // close(mte->fd);
+	// list_remove(&mte->elem);
+	// free(mte);
 }
 #endif
 

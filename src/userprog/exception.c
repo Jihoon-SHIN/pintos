@@ -195,7 +195,6 @@ page_fault (struct intr_frame *f)
   if(load_success)
     return;
   
-
   #endif
   f->eip = f->eax;
   f->eax = 0xffffffff;
