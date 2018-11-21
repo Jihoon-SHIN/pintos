@@ -1,0 +1,345 @@
+			+---------------------------+
+			|	   CS 330	    |
+			| PROJECT 3: VIRTUAL MEMORY |
+			|	DESIGN DOCUMENT	    |
+			+---------------------------+
+
+---- GROUP ----
+
+>> Fill in the names and email addresses of your group members.
+
+신지훈 <jihoon9030@kaist.ac.kr>
+김태연 <ktyty7@kaist.ac.kr>
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for the
+>> TAs, or extra credit, please give them here.
+
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation, course
+>> text, lecture notes, and course staff.
+
+			PAGE TABLE MANAGEMENT
+			=====================
+
+---- DATA STRUCTURES ----
+
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+- vm/page.h
+supplementary page table entry의 페이지가 어떤 상태를 하고 있는 지 체크할 때 쓰인다. PAGE_SWAP은 swap_out 되었다는 것이므로, swap_in 이 필요하다는 것이고 PAGE_LOADED는 lazy loading을 사용하므로 page가 load 되었다는 것을 알려준다.
+enum page_type
+{
+	PAGE_STACK_L,
+	PAGE_STACK,
+	PAGE_FILE,
+	PAGE_SWAP,
+	PAGE_EXIT,
+	PAGE_LOADED,
+	PAGE_MMAP,
+};
+
+-vm/page.h
+sup_page_table_entry로 page가 load되기 위한 모든 정보들을 저장한다. page가 load 되는 것은 grow stack, load_segment에서의 file 정보 저장, mmap 이 있으므로 이들 정보를 각각 저장하기 위한 구조체 멤버들을 포함한다.
+struct sup_page_table_entry
+{
+	void *upage;
+	int type; 
+	bool writable;
+
+	struct file *file;
+	off_t ofs;
+	size_t page_read_bytes;
+	size_t page_zero_bytes;
+
+	int swap_index;
+	struct mmap_table_entry *mte;
+	struct list_elem elem;
+
+};
+
+-threads/thread.h
+exception에서 esp 값은 중요한 척도로 쓰인다. 하지만 kernel 코드를 실행하던 중에 exception이 발생하면(ex syscall) esp값이 커널 영역을 가리키게 되므로, 미리 esp값을 저장해두어야하는데, thread 구조체에 저장해두면 어디서든 쉽게 접근 가능할 것이다. spt는 sup_page_table_entry를 저장하는 table로 esp와 마찬가지로 thread 구조체에 저장해두면 쉽게 접근 가능하고, synchronization도 쉽게 할 수 있다.
+struct thread
+{
+   ‘’’
+  #ifdef VM
+   void* esp;
+   struct list spt;
+   struct list mmap_list;
+  #endif
+   ‘’’
+};
+
+-vm/frame.h
+frame_table_entry 구조체에 대한 설명은 B1에 있음
+struct frame_table_entry
+{
+	void* frame;
+	struct thread *thread;
+	struct sup_page_table_entry *spte;
+	struct list_elem elem;
+};
+
+
+---- ALGORITHMS ----
+
+>> A2: In a few paragraphs, describe your code for locating the frame,
+>> if any, that contains the data of a given page.
+
+frame.h 와 frame.c 에서 frame_table_entry와 frame_table_list를 구현했다. frame_table_list는 frame_table_entry를 저장하는 table 역할을 한다. frame_table_entry 구조체에 특이점은 sup_page_table_entry 구조체를 저장한다는 점이다. 
+
+따라서 page가 주어지면 frame_table_list에서 frame_table_entry에 있는 spte의 upage와 page를 비교해가면서 fte를 찾을 수 있고, fte에 저장되어 있는 frame을 찾으면 우리가 원하는 frame 주소를 얻어낼 수 있다.
+
+
+>> A3: How does your code coordinate accessed and dirty bits between
+>> kernel and user virtual addresses that alias a single frame, or
+>> alternatively how do you avoid the issue?
+
+우리는 메모리에 접근할 때 user virtual addresses를 통해서만 접근했다. frame을 할당받을 때에서 PAL_USER를 사용하여 kernel pool이 아닌 user pool에서만 frame을 할당받아 kernel virtual address를 접근하는 것을 피할 수 있었다.
+
+---- SYNCHRONIZATION ----
+
+>> A4: When two user processes both need a new frame at the same time,
+>> how are races avoided?
+
+우리 코드에서 새로운 frame을 할당 받는 과정은 다음과 같다. lazy loading 으로 구현되어있으므로 page.c 에 있는 page_swap_in, page_load_mmap, page_load_stack, page_load_file 이 호출될 때 frame_allocate를 호출한다. frame_allocate는 palloc_get_page(PAL_USER|PAL_ZERO) 를 통해 kpage를 할당받게 되는데, 이 때 page가 다 할당되어 메모리가 부족하면 swap_out 을 하여 kpage를 할당받게 해준다. 이 작업이 끝나면, page.c 에 있는 저 함수들로 돌아와 install_page를 성공적으로 마치면 된다.
+
+따라서 우리는 page_swap_in, page_load_mmap, page_load_stack, page_load_file 이 네 개의 함수가 실행될 때 lock_acquire(&page_lock)을 하고, 네 개의 함수가 종료될 때 lock_release(&page_lock)을 해주었다. 이렇게 함으로써 두 개의 프로세스가 동시에 프레임을 할당받을 때에도 race condition이 형성되지 않았다.
+
+---- RATIONALE ----
+
+>> A5: Why did you choose the data structure(s) that you did for
+>> representing virtual-to-physical mappings?
+
+우리는 list를 사용했다. 도큐먼트에서는 hash-map을 사용하라고 권장했지만 필수사항이 아니었기 때문에 익숙한 list를 사용했다.
+
+두 개의 list를 사용헀는데, frame_table_list 와 thread 구조체 안에 있는 spt 이다. 둘 다 virtual-to-physical mapping 이 되어있는 지 확인할 수 있었다. frame_table_list 안에 frame_table_entry에 있다는 것은 frame_allocatie가 호출되고 palloc_get_page가 호출 되었으므로 mapping이 되었다는 소리이다. 또한 spt에 있는 sup_page_table_entry의 type 이 PAGE_LOADED인 경우는 frame_allocate 호출 후, install_page까지 끝낸 것이므로 virtual-to-physical mapping이 되었다는 것을 알 수 있다.
+
+		       PAGING TO AND FROM DISK
+		       =======================
+
+---- DATA STRUCTURES ----
+
+>> B1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+-vm/frame.h
+struct frame_table_entry
+{
+	void* frame;
+	struct thread *thread;
+	struct sup_page_table_entry *spte;
+	struct list_elem elem;
+};
+
+void* frame은 해당 frame_table_entry의 frame address를 저장한다.
+struct thread *thread는 해당 frame의 owner thread를 저장한다.
+struct sup_page_table_entry *spte는 이 frame_table_entry와 연결되어 있는 상태의 sup_page_table_entry의 포인터이다.
+struct list_elem elem은 이 frame_table_entry를 list 구조로 묶기 위한 항목이다.
+
+-vm/frame.c
+static struct list frame_table_list;
+static struct lock frame_table_lock;
+
+struct list frame_table_list 는 frame_table_entry의 list이다.
+struct lock frame_table_lock 은 frame_table_list 를 향한 접근에서의 synchronization을 위해 사용되는 lock이다.
+
+---- ALGORITHMS ----
+
+>> B2: When a frame is required but none is free, some frame must be
+>> evicted.  Describe your code for choosing a frame to evict.
+
+Frame eviction을 구현할 때 FIFO를 사용했다. 이에 관련된 code는 다음과 같다.
+void evict_frame(void)
+{
+	lock_acquire(&frame_table_lock);
+
+	struct list_elem *e;
+	struct frame_table_entry *fte;
+	for(e=list_begin(&frame_table_list) ; e!=list_end(&frame_table_list) ; e = list_next(e))
+	{
+		fte = list_entry(e, struct frame_table_entry, elem);
+		if(fte->spte->type == PAGE_LOADED || fte->spte->type == PAGE_MMAP)
+		{
+			fte->spte->swap_index = swap_out(fte->frame);
+			fte->spte->type = PAGE_SWAP;
+			list_remove(&fte->elem);
+			pagedir_clear_page(fte->thread->pagedir, fte->spte->upage);
+			palloc_free_page(fte->frame);
+			free(fte);
+			break;
+		}
+	}
+	lock_release(&frame_table_lock);
+}
+이 부분을 간략히 설명하자면 다음과 같다. 우선 frame_table_lock을 걸어준 다음, for문을 통해 frame_table_list의 각 entry 중 처음으로 나오는 “evict 가능한 entry”, 즉 PAGE_LOADED 상태인 sup_page_table_entry(spte)와 연결되어 있는 frame_table_entry(fte)를 evict한다. 
+eviction 과정에서는 page를 swap out하는데, 이 때의 반환값 swap_index를 해당 spte에 저장한 후 상태를 PAGE_SWAP으로 바꾼다. frame_table_list에서 해당 fte를 제거하고, pagedir_clear_page를 통해 evict되는 user virtual page를 해당 thread의 pagedir에 not present 상태로 마킹해준다. 또한 palloc_free_page를 통해 해당 frame 역시 free한 후 fte도 free해준다.
+결과적으로 evicting frame과 관련된 entry들은 남아있지 않게 되며, 추후 spte의 swap_index를 통해 swap_in 될 수 있는 상태가 된다.
+
+>> B3: When a process P obtains a frame that was previously used by a
+>> process Q, how do you adjust the page table (and any other data
+>> structures) to reflect the frame Q no longer has?
+
+Process Q 가 해당 frame을 obtain한 상태가 아니므로 page_fault를 통해 page_load(addr)가 call된다. page_load에서는 spte를 찾아서 (PAGE_SWAP일 경우) page_swap_in(spte)가 call되며 swap_in한다.
+swap in 과정에서는 우선 frame_allocate(PAL_USER, spte)를 통해 frame을 받아 install_page(spte->upage, kpage, spte->writable)로 page를 install한다. 이후 B2에서와 같이 남아있는 spte의 swap_index를 이용해 swap_in을 하고 상태를 PAGE_LOADED로 바꿔서 Process Q 가 해당 frame을 다시 이용할 수 있는 상태로 만든다.
+
+>> B4: Explain your heuristic for deciding whether a page fault for an
+>> invalid virtual address should cause the stack to be extended into
+>> the page that faulted.
+
+exception.c의 page_fault에서 fault_addr를 이용하여 조건에 따라 exit(-1)을 하거나, stack을 grow하거나, 그 이외의 load 등을 하였다. 
+error code의 present bit이 1이거나, fault_addr가 user virtual address가 아닌, 또는 범위를 벗어난 경우에는 exit(-1)을 하였다.
+정상적인 경우에서 우리가 stack을 grow해주는지 판별하기 위해서 다음과 같은 code를 이용하였다.
+
+  bool check_stack_size = (fault_addr < PHYS_BASE - 0x800000);
+  bool check_push = (fault_addr==f->esp-4);
+  bool check_pushA = (fault_addr==f->esp-32);
+  
+  if(!check_stack_size && (check_push || fault_addr >=esp || check_pushA))
+  {
+    page_grow_stack(fault_addr);
+  }
+
+이는 현재 fault_addr와 stack pointer간의 간격을 비교하여 push 혹은 pushA로 인한 page_fault임이 확인되었을 경우 page_grow_stack(fault_addr)가 call되는 내용이다.
+
+
+---- SYNCHRONIZATION ----
+
+>> B5: Explain the basics of your VM synchronization design.  In
+>> particular, explain how it prevents deadlock.  (Refer to the
+>> textbook for an explanation of the necessary conditions for
+>> deadlock.)
+
+frame_lock의 경우 frame_table_list의 내용을 수정하는 직전과 직후에 lock_acquire와 lock_release를 통해 synchronization을 구현하였다. 
+page_lock의 경우 page_load_file이나 page_swap_in 등의 load하는 함수의 처음과 끝에서 acquire, release 한다.
+page_load_file 등에서 filesys_lock이 사용되는데, 이 lock이 이미 acquire된 상황에서 page_fault를 통해 page_load_file이 호출된 경우가 존재한다는 것을 감안하여 lock_held_by_current_thread를 사용하여 적절하게 synchronization을 하였다.
+Necessary conditions for deadlock인 Mutual Exclusion, Hold and Wait, No Preemption, Circular Wait이 동시에 성립하는 경우는 존재하지 않는다.
+swap_lock은 swap_in, swap_out 등의 swap 작업이 한번에 하나씩만 가능하도록 해준다.
+
+>> B6: A page fault in process P can cause another process Q's frame
+>> to be evicted.  How do you ensure that Q cannot access or modify
+>> the page during the eviction process?  How do you avoid a race
+>> between P evicting Q's frame and Q faulting the page back in?
+
+Q가 해당 page에 접근하기 위해서는 frame_table_list를 통하여 접근하여야 한다. 하지만 Eviction process는 frame_lock으로 묶여있기에 race condition을 피할 수 있다.
+
+>> B7: Suppose a page fault in process P causes a page to be read from
+>> the file system or swap.  How do you ensure that a second process Q
+>> cannot interfere by e.g. attempting to evict the frame while it is
+>> still being read in?
+
+exception.c에서 page_fault를 핸들링 할 때 page_load(void *addr) 를 호출하게 되고, page_load는 addr를 가지고 있는  sup_page_table_entry 찾아서 type을 확인하고 4개의 함수, page_load_mmap, page_load_file, page_load_stack, page_swap_in 을 type에 맞게 호출한다. 이 4개의 함수에서만 frame_allocate를 실행하고 frame_allocate에서 swap_out이 실행된다. 그런데, 4개의 함수에 실행과 종료에는 lock이 걸려 있기 때문에 process 들끼리 interfere하는 일은 발생하지 않게 된다.
+
+또한 eviction을 위해 frame_table_list에 접근하기 위해서는 frame_table_lock을 acquire 해야하므로, process 끼리 interfere하지 않게 된다.
+
+>> B8: Explain how you handle access to paged-out pages that occur
+>> during system calls.  Do you use page faults to bring in pages (as
+>> in user programs), or do you have a mechanism for "locking" frames
+>> into physical memory, or do you use some other design?  How do you
+>> gracefully handle attempted accesses to invalid virtual addresses?
+
+system call 도중 page fault가 발생한 경우 esp가 kernel 영역을 가리키게 되므로 일반적인 경우와 다르다. 따라서 syscall_handler에서 thread 구조체에 esp를 저장해 놓고, page_fault에서 user 영역의 fault가 아님이 확인되었을 때 thread의 esp에서 옛 esp를 복구하여 처리한다.
+
+---- RATIONALE ----
+
+>> B9: A single lock for the whole VM system would make
+>> synchronization easy, but limit parallelism.  On the other hand,
+>> using many locks complicates synchronization and raises the
+>> possibility for deadlock but allows for high parallelism.  Explain
+>> where your design falls along this continuum and why you chose to
+>> design it this way.
+
+critical section을 최소화하는 방향으로 작성 후 필요한 부분에 한하여 단순한 lock을 사용하였다. 따라서 deadlock 없이 적절한 parallelism을 유지할 수 있도록 하였다.
+
+			 MEMORY MAPPED FILES
+			 ===================
+
+---- DATA STRUCTURES ----
+
+>> C1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+-vm/page.h
+mmap 을 할 때에 필요한 정보들을 저장하는 구조체로 mmap_table_entry이다. mmap_id는 mmap이 호출될 떄마다 고유값을 가지게 되고, file은 fd를 가지고 있는 file, base는 mmap의 argument로 들어오는 addr 값이다. 이 base 값은 munmap을 할 때 다시 file에 write를 해줘야할 때 유용하게 사용된다.  size는 file의 length를 의미한다. thread 구조체 안에 있는 mmap_list (mmap table) 에 의해 관리될 것이기 때문에 struct list_elem elem; 을 선언했다.
+struct mmap_table_entry
+{
+	struct file *file;
+	int mmap_id;
+	void* base;
+	int size;
+	int fd;
+	struct list_elem elem;
+};
+
+
+
+-threads/thread.h
+mmap_list는 mmap_table_entry를 유용하게 관리하기 위한 table이다. 간단하게 list로 선언했다.
+struct thread
+{
+   ‘’’
+  #ifdef VM
+   ‘’’
+   struct list mmap_list;
+  #endif
+   ‘’’
+};
+
+
+---- ALGORITHMS ----
+
+>> C2: Describe how memory mapped files integrate into your virtual
+>> memory subsystem.  Explain how the page fault and eviction
+>> processes differ between swap pages and other pages.
+
+memory mapped files 는 원래의 시스템에 잘 융화할 수 있었다. 우선 int mmap(int fd, void *addr)을 호출하게 되면, mmap 또한 lazy loading을 해주기로 했다. file에 대한 것이므로 load_segment에서 file을 spte에 저장했던 방식 그대로 저장한다. 그 후, exception이 발생하면 spte에서 type을 확인하고 lazy loading을 해주어야한다. mmap에 대한 lazy loading인 것이 확인이 되면, page_load_file에서 했던 방식 그대로 spte를 이용해서 file_read_at 을 이용해서 맞는 정보들이 있는 지 확인하고 frame_allocaate, install_page를 해서 memory 에 lazy loading 해준다. 이렇게 lazy loading 되면 spte->type=PAGE_LOADED로 변경되고 자연스럽게 swap_out, swap_in 될 수 있게 된다. 
+
+>> C3: Explain how you determine whether a new file mapping overlaps
+>> any existing segment.
+
+우리는 mmap에서 spte를 만들 때, spte->upage 와 같은 upage를 가지는 spte가 있는 지 table에서 확인하는 작업을 거쳤고, 중복되는 것이 있으면 mmap하지 않았다. 따라서 overlaps를 허용하지 않았다.
+
+---- RATIONALE ----
+
+>> C4: Mappings created with "mmap" have similar semantics to those of
+>> data demand-paged from executables, except that "mmap" mappings are
+>> written back to their original files, not to swap.  This implies
+>> that much of their implementation can be shared.  Explain why your
+>> implementation either does or does not share much of the code for
+>> the two situations.
+
+우리는 둘의 상황에서 많은 것을 공유했다. 같은 형식의 supplementary_page_table_entry를 사용했다. file을 lazy loading 하는 것과, mmap을 lazy loading 할 때 사용하는 page_load_file과 page_load_mmap 은 한 줄씩만 다른 코드를 사용했다. 
+
+즉, mmap과 file은 모든 코드를 share한다고 볼 수 있다. 하지만 구현할 때에는 구별이 필요한 것으로 생각되어 같이 따로 구현했는데, 합쳐도 될 것이다.
+
+			   SURVEY QUESTIONS
+			   ================
+
+Answering these questions is optional, but it will help us improve the
+course in future quarters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the quarter.
+
+>> In your opinion, was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+
+>> Is there some particular fact or hint we should give students in
+>> future quarters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future quarters or the remaining projects?
+
+>> Any other comments?
+
+
