@@ -16,7 +16,6 @@ struct frame_table_entry
 	void* frame;
 	struct thread *thread;
 	struct sup_page_table_entry *spte;
-	// int count_LRU;
 	struct list_elem elem;
 };
 

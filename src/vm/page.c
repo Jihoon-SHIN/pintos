@@ -259,7 +259,8 @@ page_load_mmap(struct sup_page_table_entry *spte)
 			return success;
 		}
 	}
-	spte->type = PAGE_LOADED;
+	// spte->type = PAGE_LOADED;
+	spte->type = PAGE_MMAP;
 	lock_release(&page_lock);
 	return success;
 }

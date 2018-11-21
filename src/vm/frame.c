@@ -86,14 +86,8 @@ evict_frame(void)
 		fte = list_entry(e, struct frame_table_entry, elem);
 		// if(fte->spte->type != PAGE_STACK_L && fte->spte->type != PAGE_STACK)
 		// {
-		if(fte->spte->type == PAGE_LOADED || fte->spte->type == PAGE_MMAP)
+		if(fte->spte->type == PAGE_LOADED )
 		{
-		// if(pagedir_is_accessed(fte->thread->pagedir, fte->frame))
-		// {
-		// 	pagedir_set_accessed(fte->thread->pagedir, fte->frame, false);
-		// }
-		// else
-		// {
 			fte->spte->swap_index = swap_out(fte->frame);
 			fte->spte->type = PAGE_SWAP;
 			list_remove(&fte->elem);
@@ -101,7 +95,6 @@ evict_frame(void)
 			palloc_free_page(fte->frame);
 			free(fte);
 			break;
-			// }
 		}
 		// }		
 	}
