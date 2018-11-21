@@ -176,9 +176,10 @@ process_exit (void)
   }
 
   #ifdef VM
-
-  for(e_mte= list_begin(&thread_current()->mmap_list); e_mte != list_end(&thread_current()->mmap_list) ; e_mte = list_next(e_mte))
+  struct list_elem *next;
+  for(e_mte= list_begin(&thread_current()->mmap_list); e_mte != list_end(&thread_current()->mmap_list) ; e_mte = next)
   {
+    next = list_next(e_mte);
     struct mmap_table_entry *mte = list_entry(e_mte, struct mmap_table_entry, elem);
     munmap(mte->mmap_id);
   }
@@ -326,9 +327,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
   fn_copy = malloc(strlen(file_name)+1);
   strlcpy(fn_copy, file_name, strlen(file_name)+1);
   fn_copy = strtok_r(fn_copy, " ", &save_ptr);
+
   lock_acquire(&filesys_lock);
   file = filesys_open (fn_copy);
   lock_release(&filesys_lock);
+  
   free(fn_copy);
   if (file == NULL) 
     {
@@ -516,7 +519,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
       /* Get a page of memory. */
     #ifdef VM
-      struct sup_page_table_entry *spte = page_file(file, ofs, upage, read_bytes, zero_bytes, writable);
+      struct sup_page_table_entry *spte = page_file(file, ofs, upage, page_read_bytes, page_zero_bytes, writable);
       // uint8_t *kpage = frame_allocate(PAL_USER, spte);
       // if (kpage == NULL)
       //   return false;

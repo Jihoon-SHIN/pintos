@@ -11,6 +11,8 @@
 #include "userprog/syscall.h"
 #include "filesys/off_t.h"
 
+struct lock page_lock;
+
 enum page_type
 {
 	PAGE_STACK_L,

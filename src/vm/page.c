@@ -18,6 +18,12 @@
 
 
 void
+page_init(void)
+{
+	lock_init(&page_lock);
+}
+
+void
 page_grow_stack(void *addr)
 {
 	struct sup_page_table_entry *spte = malloc(sizeof(struct sup_page_table_entry));
@@ -146,83 +152,27 @@ find_page2(void *addr)
 bool
 page_load_file(struct sup_page_table_entry *spte) 
 {  
-  uint8_t *kpage = frame_allocate(PAL_USER | PAL_ZERO, spte);
-  bool success = true;
+	lock_acquire(&page_lock);
+	uint8_t *kpage = frame_allocate(PAL_USER | PAL_ZERO, spte);
+	bool success = true;
+	bool flag = false;
   /* Load this page. */
-  // lock_acquire(&filesys_lock);
-  if (file_read_at (spte->file, kpage, spte->page_read_bytes, spte->ofs) != (int) spte->page_read_bytes)
-  	ASSERT(0);
+	if(!lock_held_by_current_thread(&filesys_lock))
+	{
+  		lock_acquire(&filesys_lock);
+  		flag = true;
+	}
 
-  // lock_release(&filesys_lock);
+	if (file_read_at (spte->file, kpage, spte->page_read_bytes, spte->ofs) != (int) spte->page_read_bytes)
+		ASSERT(0);
+
+	if(flag)
+  		lock_release(&filesys_lock);
 
 
   // if(spte->page_read_bytes > 0)
   // memset (kpage + spte->page_read_bytes, 0, spte->page_zero_bytes);
-  spte->type = PAGE_LOADED;
-
-  if (kpage != NULL) 
-  {
-  	success = install_page (spte->upage, kpage, spte->writable);
-  	if(!success)
-  	{
-  		free(spte);
-  		frame_free(kpage);
-  		return success;
-  	}
-  }
-  return success;
-}
-
-
-bool
-page_swap_in(struct sup_page_table_entry *spte)
-{
-	uint8_t *kpage = frame_allocate(PAL_USER, spte);
-	if(kpage == NULL)
-	{
-		return false;
-	}
-	
-	if(!install_page(spte->upage, kpage, spte->writable))
-	{
-		frame_free(kpage);
-		return false;
-	}
-	swap_in(spte->swap_index, kpage);
 	spte->type = PAGE_LOADED;
-	return true;
-}
-
-bool
-page_load_stack(struct sup_page_table_entry *spte)
-{
-	uint8_t *kpage = frame_allocate(PAL_USER|PAL_ZERO, spte);
-	bool success = true;
-	if (kpage != NULL) 
-	{
-      success = install_page (spte->upage, kpage, spte->writable);
-      if(!success)
-      {
-      	free(spte);
-        frame_free(kpage);
-        return success;
-      }
-	}
-	spte->type = PAGE_LOADED;
-	return success;
-}
-
-
-bool
-page_load_mmap(struct sup_page_table_entry *spte)
-{
-	uint8_t *kpage = frame_allocate(PAL_USER | PAL_ZERO, spte);
-	bool success = true;
-	/* Load this page. */
-	// lock_acquire(&filesys_lock);
-	if (file_read_at (spte->file, kpage, spte->page_read_bytes, spte->ofs) != (int) spte->page_read_bytes)
-		ASSERT(0);
-
 	if (kpage != NULL) 
 	{
 		success = install_page (spte->upage, kpage, spte->writable);
@@ -233,6 +183,83 @@ page_load_mmap(struct sup_page_table_entry *spte)
 			return success;
 		}
 	}
+	lock_release(&page_lock);
+	return success;
+}
+
+
+bool
+page_swap_in(struct sup_page_table_entry *spte)
+{
+	lock_acquire(&page_lock);
+	uint8_t *kpage = frame_allocate(PAL_USER, spte);
+	if(kpage == NULL)
+	{
+		lock_release(&page_lock);
+		return false;
+	}
+	
+	if(!install_page(spte->upage, kpage, spte->writable))
+	{
+		frame_free(kpage);
+		lock_release(&page_lock);
+		return false;
+	}
+	swap_in(spte->swap_index, kpage);
 	spte->type = PAGE_LOADED;
+	lock_release(&page_lock);
+	return true;
+}
+
+bool
+page_load_stack(struct sup_page_table_entry *spte)
+{
+	lock_acquire(&page_lock);
+	uint8_t *kpage = frame_allocate(PAL_USER|PAL_ZERO, spte);
+	bool success = true;
+	if (kpage != NULL) 
+	{
+      success = install_page (spte->upage, kpage, spte->writable);
+      if(!success)
+      {
+      	free(spte);
+        frame_free(kpage);
+        lock_release(&page_lock);
+        return success;
+      }
+	}
+	spte->type = PAGE_LOADED;
+	lock_release(&page_lock);
+	return success;
+}
+
+
+bool
+page_load_mmap(struct sup_page_table_entry *spte)
+{
+	lock_acquire(&page_lock);
+	uint8_t *kpage = frame_allocate(PAL_USER | PAL_ZERO, spte);
+	bool success = true;
+	lock_acquire(&filesys_lock);
+	if (file_read_at (spte->file, kpage, spte->page_read_bytes, spte->ofs) != (int) spte->page_read_bytes)
+	{
+		lock_release(&page_lock);
+		ASSERT(0);
+	}
+	lock_release(&filesys_lock);
+
+	if (kpage != NULL) 
+	{
+		success = install_page (spte->upage, kpage, spte->writable);
+		if(!success)
+		{
+			free(spte);
+			frame_free(kpage);
+			lock_release(&page_lock);
+			return success;
+		}
+	}
+	spte->type = PAGE_LOADED;
+	lock_release(&page_lock);
 	return success;
 }

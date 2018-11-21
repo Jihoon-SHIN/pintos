@@ -24,6 +24,7 @@ frame_init(void)
 uint8_t *
 frame_allocate(enum palloc_flags flags, struct sup_page_table_entry *spte)
 {	
+	// lock_acquire(&page_lock);
 	uint8_t *kpage;
 	struct frame_table_entry *fte = malloc(sizeof(struct frame_table_entry));
 	kpage = palloc_get_page(flags);

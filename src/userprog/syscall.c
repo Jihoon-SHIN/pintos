@@ -257,7 +257,7 @@ mmap(int fd, void *addr)
 	if(addr == 0 || pg_ofs(addr) !=0)
 		return -1;
 
-	if((uint32_t)addr & PGSIZE != 0)
+	if((uint32_t)addr % PGSIZE != 0)
 		return -1;
 
 	if(!is_user_vaddr(addr) || addr < BOTTOM_USER_VADDR)
@@ -268,9 +268,10 @@ mmap(int fd, void *addr)
 	struct file_element *fe = find_file(fd);
 	if(fe==NULL) return -1;
 
-	// lock_acquire(&filesys_lock);
+	lock_acquire(&filesys_lock);
 	struct file *f = file_reopen(fe->file);
-	// lock_release(&filesys_lock);
+	lock_release(&filesys_lock);
+	
 	if(f== NULL || file_length(f) == 0)
 		return -1;
 
@@ -347,11 +348,11 @@ munmap(int mapping)
 	}
 
 	// // lock_acquire(&filesys_lock);
-	// file_close(mte->file);
+	file_close(mte->file);
 	// // lock_release(&filesys_lock);
 	// // close(mte->fd);
-	// list_remove(&mte->elem);
-	// free(mte);
+	list_remove(&mte->elem);
+	free(mte);
 }
 #endif
 

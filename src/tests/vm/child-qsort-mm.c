@@ -17,6 +17,7 @@ main (int argc UNUSED, char *argv[])
 
   quiet = true;
 
+  // printf("123 %s\n", argv[1]);
   CHECK ((handle = open (argv[1])) > 1, "open \"%s\"", argv[1]);
   CHECK (mmap (handle, p) != MAP_FAILED, "mmap \"%s\"", argv[1]);
   qsort_bytes (p, 1024 * 128);
