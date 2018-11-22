@@ -31,16 +31,6 @@ page_grow_stack(void *addr)
 	spte->upage = pg_round_down(addr);
 	spte->type = PAGE_STACK;
 	spte->writable = true;
-	// uint8_t *kpage = frame_allocate(PAL_USER | PAL_ZERO, spte);
-	// if (kpage != NULL) 
-	// {
- //      success = install_page (spte->upage, kpage, true);
- //      if(!success)
- //      {
- //      	free(spte);
- //        frame_free(kpage);
- //      }
-	// }
 	list_push_back(&thread_current()->spt, &spte->elem);
 }
 
@@ -48,7 +38,6 @@ struct sup_page_table_entry *
 page_file(struct file *file, off_t ofs, uint8_t *upage, size_t page_read_bytes, size_t page_zero_bytes, bool writable)
 {
 	struct sup_page_table_entry *spte = malloc(sizeof(struct sup_page_table_entry));
-
 	spte->upage = upage;
 	spte->file = file;
 	spte->ofs = ofs;
@@ -56,14 +45,6 @@ page_file(struct file *file, off_t ofs, uint8_t *upage, size_t page_read_bytes, 
 	spte->page_zero_bytes = page_zero_bytes;
 	spte->writable = writable;
 	spte->type = PAGE_FILE;
-	// spte->type = PAGE_LOADED;
-
-	// if(find_page2(spte->upage))
-	// {
-	// 	free(spte);
-	// 	return NULL;
-	// }
-
 	list_push_back(&thread_current()->spt, &spte->elem);
 	return spte;
 }
@@ -81,7 +62,6 @@ page_mmap(struct mmap_table_entry * mte, size_t page_read_bytes, size_t page_zer
 	spte->page_read_bytes = page_read_bytes;
 	spte->page_zero_bytes = page_zero_bytes;
 	spte->ofs = ofs;
-
 	if(find_page2(spte->upage))
 	{
 		free(spte);
@@ -156,13 +136,11 @@ page_load_file(struct sup_page_table_entry *spte)
   		lock_acquire(&filesys_lock);
   		flag = true;
 	}
-
 	if (file_read_at (spte->file, kpage, spte->page_read_bytes, spte->ofs) != (int) spte->page_read_bytes)
 		ASSERT(0);
 
 	if(flag)
   		lock_release(&filesys_lock);
-
 
 	spte->type = PAGE_LOADED;
 	if (kpage != NULL) 
@@ -251,7 +229,6 @@ page_load_mmap(struct sup_page_table_entry *spte)
 			return success;
 		}
 	}
-	// spte->type = PAGE_LOADED;
 	spte->type = PAGE_MMAP;
 	lock_release(&page_lock);
 	return success;

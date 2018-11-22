@@ -147,12 +147,7 @@ process_exit (void)
   struct list_elem *e_spt;
   struct list_elem *e_mte;
 
-  // lock_acquire(&filesys_lock);
-  // #ifdef USERPROG
   file_close(curr->file);
-  // #endif
-  // lock_release(&filesys_lock);
-  // close_all_file
   for(ee=list_begin(&curr->file_list); ee!= list_end(&curr->file_list); ee= list_next(ee))
   {
     struct file_element *fe = list_entry(ee, struct file_element, elem);
@@ -177,26 +172,22 @@ process_exit (void)
 
   #ifdef VM
   struct list_elem *next;
+  // Free mmap
   for(e_mte= list_begin(&thread_current()->mmap_list); e_mte != list_end(&thread_current()->mmap_list) ; e_mte = next)
   {
     next = list_next(e_mte);
     struct mmap_table_entry *mte = list_entry(e_mte, struct mmap_table_entry, elem);
     munmap(mte->mmap_id);
   }
-
-
+  // Free supplementary page table
   for(e_spt=list_begin(&thread_current()->spt); e_spt != list_end(&thread_current()->spt) ; e_spt = list_next(e_spt))
   {
     struct sup_page_table_entry *spte = list_entry(e_spt, struct sup_page_table_entry, elem);
-    // spte->type = PAGE_EXIT;
     e_spt = list_remove(&spte->elem)->prev;
     frame_free(pagedir_get_page(thread_current()->pagedir, spte->upage));
     pagedir_clear_page(thread_current()->pagedir, spte->upage);
     free(spte);
   }
-
-  
-
   #endif
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -520,27 +511,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       /* Get a page of memory. */
     #ifdef VM
       struct sup_page_table_entry *spte = page_file(file, ofs, upage, page_read_bytes, page_zero_bytes, writable);
-      // uint8_t *kpage = frame_allocate(PAL_USER, spte);
-      // if (kpage == NULL)
-      //   return false;
-
-      // /* Load this page. */
-      // lock_acquire(&filesys_lock);
-      // if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
-      //   {
-      //     frame_free(kpage);
-      //     lock_release(&filesys_lock);
-      //     return false; 
-      //   }
-      // lock_release(&filesys_lock);
-      // memset (kpage + page_read_bytes, 0, page_zero_bytes);
-
-      // /* Add the page to the process's address space. */
-      // if (!install_page (upage, kpage, writable)) 
-      //   {
-      //     frame_free(kpage);
-      //     return false; 
-      //   }
     #else
       uint8_t *kpage = palloc_get_page (PAL_USER);
       if (kpage == NULL)

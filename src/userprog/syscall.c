@@ -257,14 +257,9 @@ mmap(int fd, void *addr)
 	if(addr == 0 || pg_ofs(addr) !=0)
 		return -1;
 
-	if((uint32_t)addr % PGSIZE != 0)
-		return -1;
-
 	if(!is_user_vaddr(addr) || addr < BOTTOM_USER_VADDR)
 		return -1;
-	// int size = filesize(fd);
-	// if(size==0)
-	// 	return -1;
+
 	struct file_element *fe = find_file(fd);
 	if(fe==NULL) return -1;
 
@@ -274,14 +269,9 @@ mmap(int fd, void *addr)
 	
 	if(f== NULL || file_length(f) == 0)
 		return -1;
-
 	void *iter;
 	struct mmap_table_entry *mte = malloc(sizeof(struct mmap_table_entry));
 
-
-	// lock_acquire(&filesys_lock);
-	// struct file *f = file_reopen(fe->file);
-	// lock_release(&filesys_lock);
 	mte->file = f;
 	mte->mmap_id = mmap_id;
 	mte->base = addr;
@@ -307,7 +297,6 @@ mmap(int fd, void *addr)
 		addr += PGSIZE;
 		ofs += page_read_bytes;
 	}
-	
 	list_push_back(&thread_current()->mmap_list, &mte->elem);
 	mmap_id = mmap_id + 1;
 	return mte->mmap_id;
@@ -323,8 +312,6 @@ munmap(int mapping)
 		mte = list_entry(e, struct mmap_table_entry, elem);
 		if(mte->mmap_id == mapping) break;
 	}
-	
-	// ASSERT(mte->mmap_id == mapping);
 	if(mte->mmap_id != mapping)
 		return;
 	void *addr;
@@ -346,11 +333,7 @@ munmap(int mapping)
 			free(spte);
 		}
 	}
-
-	// // lock_acquire(&filesys_lock);
 	file_close(mte->file);
-	// // lock_release(&filesys_lock);
-	// // close(mte->fd);
 	list_remove(&mte->elem);
 	free(mte);
 }
