@@ -112,6 +112,9 @@ struct thread
     struct list spt;
     struct list mmap_list;
 #endif
+#ifdef FILESYS
+    struct dir *working_dir;
+#endif
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };

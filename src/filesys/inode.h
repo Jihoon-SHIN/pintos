@@ -14,7 +14,7 @@ struct bitmap;
 extern struct disk *filesys_disk;
 
 /* On-disk inode.
-   Must be exactly BLOCK_SECTOR_SIZE bytes long. */
+   Must be exactly DISK_SECTOR_SIZE bytes long. */
 struct inode_disk
 {
     disk_sector_t direct_blocks[DIRECT_BLOCK_NUM];   /* Direct blocks */

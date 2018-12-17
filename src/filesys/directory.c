@@ -5,26 +5,12 @@
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
 #include "threads/malloc.h"
-
-/* A directory. */
-struct dir 
-  {
-    struct inode *inode;                /* Backing store. */
-    off_t pos;                          /* Current position. */
-  };
-
-/* A single directory entry. */
-struct dir_entry 
-  {
-    disk_sector_t inode_sector;         /* Sector number of header. */
-    char name[NAME_MAX + 1];            /* Null terminated file name. */
-    bool in_use;                        /* In use or free? */
-  };
+#include "lib/user/syscall.h"
 
 /* Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */
 bool
-dir_create (disk_sector_t sector, size_t entry_cnt) 
+dir_create (disk_sector_t sector, size_t entry_cnt)
 {
   return inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
 }
@@ -98,16 +84,18 @@ lookup (const struct dir *dir, const char *name,
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
 
-  for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
-       ofs += sizeof e) 
+  for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e; ofs += sizeof e)
+  {
     if (e.in_use && !strcmp (name, e.name)) 
       {
+        
         if (ep != NULL)
           *ep = e;
         if (ofsp != NULL)
           *ofsp = ofs;
         return true;
       }
+  }
   return false;
 }
 
@@ -123,7 +111,6 @@ dir_lookup (const struct dir *dir, const char *name,
 
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
-
   if (lookup (dir, name, &e, NULL))
     *inode = inode_open (e.inode_sector);
   else
@@ -139,12 +126,12 @@ dir_lookup (const struct dir *dir, const char *name,
    Fails if NAME is invalid (i.e. too long) or a disk or memory
    error occurs. */
 bool
-dir_add (struct dir *dir, const char *name, disk_sector_t inode_sector) 
+dir_add (struct dir *dir, const char *name, disk_sector_t inode_sector)
 {
   struct dir_entry e;
   off_t ofs;
   bool success = false;
-  
+
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
 
@@ -156,6 +143,12 @@ dir_add (struct dir *dir, const char *name, disk_sector_t inode_sector)
   if (lookup (dir, name, NULL, NULL))
     goto done;
 
+
+  struct inode *inode = inode_open(inode_sector);
+  if(!inode)
+    goto done;
+  inode->parent = dir->inode->sector;
+  inode_close(inode);
   /* Set OFS to offset of free slot.
      If there are no free slots, then it will be set to the
      current end-of-file.
@@ -178,6 +171,21 @@ dir_add (struct dir *dir, const char *name, disk_sector_t inode_sector)
   return success;
 }
 
+bool dir_is_empty (struct inode *inode)
+{
+  struct dir_entry e;
+  off_t pos = 0;
+
+  while (inode_read_at (inode, &e, sizeof e, pos) == sizeof e) 
+    {
+      pos += sizeof e;
+      if (e.in_use)
+        {
+          return false;
+        } 
+    }
+  return true;
+}
 /* Removes any entry for NAME in DIR.
    Returns true if successful, false on failure,
    which occurs only if there is no file with the given NAME. */
@@ -194,17 +202,41 @@ dir_remove (struct dir *dir, const char *name)
 
   /* Find directory entry. */
   if (!lookup (dir, name, &e, &ofs))
+  {
     goto done;
+  }
 
   /* Open inode. */
   inode = inode_open (e.inode_sector);
   if (inode == NULL)
+  {
     goto done;
+  }
+
+  if(inode->is_dir)
+  {
+    if(inode->open_cnt>1)
+    {
+      goto done;
+    }
+
+    char name[READDIR_MAX_LEN +1];
+    struct dir *new_dir = dir_open(inode);
+    if(dir_readdir(new_dir, name))
+    {
+      dir_close(new_dir);
+      goto done;
+    }
+    dir_close(new_dir);
+  }
+
 
   /* Erase directory entry. */
   e.in_use = false;
   if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e) 
+  {
     goto done;
+  }
 
   /* Remove inode. */
   inode_remove (inode);
@@ -233,4 +265,14 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
         } 
     }
   return false;
+}
+
+//Additional implementation
+struct inode *
+dir_parent_inode(struct dir *dir)
+{
+  if(dir == NULL)
+    return NULL;
+  disk_sector_t parent = dir->inode->parent;
+  return inode_open(parent);
 }

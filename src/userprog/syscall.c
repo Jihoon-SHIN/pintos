@@ -10,6 +10,11 @@
 #include "vm/page.h"
 #endif
 
+#include "filesys/file.h"
+#include "filesys/filesys.h"
+#include "filesys/inode.h"
+#include "filesys/directory.h"
+
 static void syscall_handler (struct intr_frame *);
 void exit(int status);
 
@@ -123,7 +128,7 @@ bool create(const char *file, unsigned initial_size)
 		exit(-1);
 	}
 	lock_acquire(&filesys_lock);
-	bool result = filesys_create(file, initial_size);
+	bool result = filesys_create(file, initial_size, false);
 	lock_release(&filesys_lock);
 	return result;
 }
@@ -339,6 +344,58 @@ munmap(int mapping)
 }
 #endif
 
+#ifdef FILESYS
+bool
+chdir(const char *dir)
+{
+  lock_acquire(&filesys_lock);
+  bool success = filesys_chdir(dir);
+  lock_release(&filesys_lock);
+  return success;
+}
+
+bool
+mkdir(const char *dir)
+{
+  lock_acquire(&filesys_lock);
+  bool success = filesys_create(dir, 0, true);
+  lock_release(&filesys_lock);
+  return success;
+}
+
+bool
+readdir(int fd, char *name)
+{
+  struct file_element *fm = find_file(fd);
+  if(fm==NULL)
+    return false;
+  if(!dir_check(fm->file))
+    return false;
+  if(dir_readdir(fm->file, name))
+    return true;
+  return false;
+}
+
+bool
+isdir(int fd)
+{
+  struct file_element *fm = find_file(fd);
+  if(fm == NULL)
+    return -1;
+  return dir_check(fm->file);
+}
+
+int
+inumber(int fd)
+{
+  struct file_element *fm = find_file(fd);
+  if(fm == NULL)
+    return -1;
+  return get_inode_number(fm->file);
+}
+#endif
+
+
 /* Syscall_handler */
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
@@ -425,6 +482,34 @@ syscall_handler (struct intr_frame *f UNUSED)
   		munmap(get_arg((int *)f->esp+1));
   		break;
   	}
+  	#endif
+  	#ifdef FILESYS
+
+  	case SYS_CHDIR:
+    {
+      f->eax = chdir(get_arg((int *)f->esp+1)); 
+      break;
+    }
+    case SYS_MKDIR:
+    {
+      f->eax = mkdir(get_arg((int *)f->esp+1));
+      break;
+    }
+    case SYS_READDIR:
+    {
+      f->eax = readdir(get_arg((int *)f->esp+1), get_arg((int *)f->esp+2));
+      break;
+    }
+    case SYS_ISDIR:
+    {
+      f->eax = isdir(get_arg((int *)f->esp+1));
+      break;
+    }
+    case SYS_INUMBER:
+    {
+      f->eax = inumber(get_arg((int *)f->esp+1));
+      break;
+    } 
   	#endif
   }
 }
