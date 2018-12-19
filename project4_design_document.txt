@@ -1,0 +1,194 @@
+			+----------------------------+
+			|	CS 330	           |
+			| PROJECT 4 : FILE SYSTEMS|
+			|     DESIGN DOCUMENT    |
+			+----------------------------+
+
+---- GROUP ----
+
+>> Fill in the names and email addresses of your group members.
+
+신지훈 <jihoon9030@kaist.ac.kr>
+김태연 <ktyty7@kaist.ac.kr>
+
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for the
+>> TAs, or extra credit, please give them here.
+
+Token 3개 사용합니다!
+
+
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation, course
+>> text, lecture notes, and course staff.
+
+		     INDEXED AND EXTENSIBLE FILES
+		     ============================
+
+---- DATA STRUCTURES ----
+
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+
+-filesys/inode.h
+
+#define DIRECT_BLOCK_NUM 122
+
+struct inode_disk
+{
+    disk_sector_t direct_blocks[DIRECT_BLOCK_NUM];   /* Direct blocks */
+    disk_sector_t indirect_block;                    /* Indirect blocks */
+    disk_sector_t doubly_indirect_block;             /* Doubly indirect blocks */
+    off_t length;                                     /* File size in bytes. */
+    unsigned magic;                                   /* Magic number. */
+    bool is_dir;                                      /* To check whether directory or not */
+    disk_sector_t parent;                            /* Store the parent disk_sector_t */
+};
+
+inode_disk structure 로 doubly_indirect_block까지 구현하여 충분한 메모리를 확보했다.
+
+struct indirect_disk
+{
+  disk_sector_t sectors[128];
+};
+
+indirect_disk를 위한 스트럭쳐이다.
+
+/* In-memory inode. */
+struct inode 
+  {
+    struct list_elem elem;              /* Element in inode list. */
+    disk_sector_t sector;              /* Sector number of disk location. */
+    int open_cnt;                       /* Number of openers. */
+    bool removed;                       /* True if deleted, false otherwise. */
+    int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
+    struct inode_disk data;             /* Inode content. */
+    bool is_dir;                        /* To check whether directory or not */
+    disk_sector_t parent;              /* Store the parent */
+ };
+
+inode structure이다. parent 정보를 저장하기 위해 parent 변수를 추가하고, dir에 대한 inode인지 쉽게 확인하기 위해 is_dir 변수를 추가했다.
+
+
+-threads/thread.h
+struct thread
+{
+	'''
+	#ifdef FILESYS
+	struct dir *working_dir;
+	#endif
+	'''
+
+
+}
+
+working_dir 은 현재 thread가 머물고 있는 directory를 알려주는 것이다. 이것이 있어야 directory 포인터를 변경할 때 손쉽게 할 수 있다.
+
+
+
+>> A2: What is the maximum size of a file supported by your inode
+>> structure?  Show your work.
+
+A1에서 구현된 inode_disk를 보자. 
+direct block 의 개수는 122 개, indirect_block의 경우 128개, doubly indirect_block의 경우 128*128 개이다.
+그렇다면 총 개수는 122+128+128*128 = 16,634이고, 각각의 sector 가 512 bytes 이므로
+16,634 * 512 = 8,516,608 bytes 가 된다. 이것은 file_system에서 요구하는 8MB를 넘는 메모리 양이다.
+
+
+---- SYNCHRONIZATION ----
+
+>> A3: Explain how your code avoids a race if two processes attempt to
+>> extend a file at the same time.
+
+추가로 extend를 위해 추가한 코드에는 따로 lock을 추가하지않았다.
+하지만 filesys, file 에 대한 코드를 선언할 때마다, filesys_lock을 미리 걸어두었기 때문에,
+extend 하는데에 무리가 없었다. 
+
+>> A4: Suppose processes A and B both have file F open, both
+>> positioned at end-of-file.  If A reads and B writes F at the same
+>> time, A may read all, part, or none of what B writes.  However, A
+>> may not read data other than what B writes, e.g. if B writes
+>> nonzero data, A is not allowed to see all zeros.  Explain how your
+>> code avoids this race.
+
+전체 extension 이 모두 끝나고 나서야 update가 되기 때문에, A는 B(writing)이 끝나기 전에는
+그 데이터를 읽지 못할 것이다.
+B가 writing을 다 하고 나서 extension이 이루어진 후에 A는 전체 extension된 파일을 읽을 수 있다.
+
+>> A5: Explain how your synchronization design provides "fairness".
+>> File access is "fair" if readers cannot indefinitely block writers
+>> or vice versa.  That is, many processes reading from a file cannot
+>> prevent forever another process from writing the file, and many
+>> processes writing to a file cannot prevent another process forever
+>> from reading the file.
+
+우리는 filesys 즉, inode에서 synchronization(condition variables)를 사용하지 않았기 때문에,
+starvation이 걸리지 않을 것이고 fair 하다고 할 수 있다.
+
+
+---- RATIONALE ----
+
+>> A6: Is your inode structure a multilevel index?  If so, why did you
+>> choose this particular combination of direct, indirect, and doubly
+>> indirect blocks?  If not, why did you choose an alternative inode
+>> structure, and what advantages and disadvantages does your
+>> structure have, compared to a multilevel index?
+
+file system이 8MB의 파일을 저장할 수 있도록 설계해야했고, disk block의 크기는 512byte 이므로,
+포인터가 128개 들어갈 수 있었다. 이 상황에서 doubly indirect block까지 만들면 8MB가 넘는 파일을
+안정적으로 저장할 수 있었기 때문에 이러한 조합을 사용했다.
+
+
+                            SUBDIRECTORIES
+			    ==============
+
+---- DATA STRUCTURES ----
+
+>> B1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+struct thread
+{
+...
+#ifdef FILESYS
+    struct dir *working_dir;
+#endif
+...
+}
+
+thread의 working directory pointer를 thread 구조체의 멤버로 저장한다.
+
+---- ALGORITHMS ----
+
+>> B2: Describe your code for traversing a user-specified path.  How
+>> do traversals of absolute and relative paths differ?
+
+User-specified path를 처리할 때에는 parse_dir()가 사용된다. parse_dir()에는 const char *name을 parse하여 dir *형을 반환한다. name의 첫 문자가 "/"일 경우 root directory에서, 그렇지 않을 경우 thread_current()의 working_dir에서 시작한다. 이후 strtok_r()을 이용한 for문을 돌며 다음 user-path token이  ".", "..", 혹은 다른 이름인지에 따라, 그 token이 directory일 경우 dir을 새로 dir_open()해주며 따라간다. for문을 빠져 나오게 되면 최종적으로 dir을 return한다. file 이름(user-path의 제일 마지막 segment)의 경우에는 비슷한 방법의 parse_file()을 이용한다. 결과적으로 absolute path와 relative path의 경우는 처음의 시작 문자에 따라 시작지점이 다르게 parse된다고 볼 수 있다.
+
+---- SYNCHRONIZATION ----
+
+>> B4: How do you prevent races on directory entries?  For example,
+>> only one of two simultaneous attempts to remove a single file
+>> should succeed, as should only one of two simultaneous attempts to
+>> create a file with the same name, and so on.
+
+system call mkdir의 경우 filesys_create 전후로 filesys_lock을 걸어주어 race를 방지한다.
+
+>> B5: Does your implementation allow a directory to be removed if it
+>> is open by a process or if it is in use as a process's current
+>> working directory?  If so, what happens to that process's future
+>> file system operations?  If not, how do you prevent it?
+
+dir_remove()에서 remove하려 하는 entry가 directory 일 경우, open_cnt가 1보다 크면 inode_remove()이 아닌 inode_close()를 호출한다.
+
+---- RATIONALE ----
+
+>> B6: Explain why you chose to represent the current directory of a
+>> process the way you did.
+
+thread 구조체의 멤버로 저장해 놓는 것이 가장 간단한 방법이기 때문이다.
