@@ -151,7 +151,14 @@ process_exit (void)
   for(ee=list_begin(&curr->file_list); ee!= list_end(&curr->file_list); ee= list_next(ee))
   {
     struct file_element *fe = list_entry(ee, struct file_element, elem);
-    file_close(fe->file);
+    if(dir_check(fe->file))
+    {
+      dir_close(fe->file);
+    }
+    else
+    {
+      file_close(fe->file);
+    }
     ee= list_remove(&fe->elem)->prev;
     free(fe);
   }

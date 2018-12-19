@@ -28,6 +28,10 @@ file_open (struct inode *inode)
       file->inode = inode;
       file->pos = 0;
       file->deny_write = false;
+      // if(dir_check(file))
+      // { 
+      //   return (struct file *) dir_open(inode_reopen(file->inode));
+      // }
       return file;
     }
   else

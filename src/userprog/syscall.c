@@ -201,7 +201,7 @@ write(int fd, void *buffer, unsigned size)
 		return size;
 	}
 	struct file_element *fe = find_file(fd);
-	if(fe==NULL)
+	if(fe==NULL || dir_check(fe->file))
 		return -1;
 	lock_acquire(&filesys_lock);
 	int result = file_write(fe->file, buffer, size);
@@ -228,9 +228,9 @@ tell(int fd)
 	if(fe==NULL)
 		return -1;
 	lock_acquire(&filesys_lock);
-	file_tell(fe->file);
+	unsigned result = file_tell(fe->file);
 	lock_release(&filesys_lock);
-	return (unsigned) 1;
+	return result;
 }
 
 void

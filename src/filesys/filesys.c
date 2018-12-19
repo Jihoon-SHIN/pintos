@@ -86,7 +86,7 @@ filesys_open (const char *name)
 
   if (dir != NULL)
   {
-    if(strcmp(file_name, ".") == 0 || (dir->inode->sector==ROOT_DIR_SECTOR) && (strlen(file_name) == 0))
+    if(strcmp(file_name, ".") == 0 || strlen(file_name)==0)
     {
       free(file_name);
       return (struct file *)dir;
@@ -94,11 +94,6 @@ filesys_open (const char *name)
     else if(strcmp(file_name, "..")==0)
     {
       inode = dir_parent_inode(dir);
-      if(inode == NULL)
-      {
-        free(file_name);
-        return NULL;
-      }
     }
     else
       dir_lookup (dir, file_name, &inode);
@@ -108,9 +103,6 @@ filesys_open (const char *name)
 
   if(inode ==NULL)
     return NULL;
-
-  if(inode->is_dir)
-    return (struct file *) dir_open(inode);
 
   return file_open (inode);
 }
@@ -134,35 +126,41 @@ bool
 filesys_chdir (const char *name)
 {
   struct dir *dir = parse_dir(name);
-  // struct dir *new_dir;
   struct inode *inode;
   char *file_name = parse_filename(name);
+  bool flag = false;
+
   if(dir != NULL)
   {
     if(strcmp(file_name, ".") == 0)
     {
-      thread_current()->working_dir = dir;
-      free(file_name);
-      return true;
+      flag = true;
     }
     else if(dir->inode->sector==ROOT_DIR_SECTOR && strlen(file_name) == 0)
     {
-      thread_current()->working_dir = dir;
-      free(file_name);
-      return true;
+      flag = true;
     }
     else if(strcmp(file_name, "..")==0)
     {
       inode = dir_parent_inode(dir);
-      if(inode == NULL)
-      {
-        free(file_name);
-        return false;
-      }
     }
     else
       dir_lookup (dir, file_name, &inode);
     
+
+    if(flag)
+    {
+      thread_current()->working_dir = dir;
+      free(file_name);
+      return flag;
+    }
+
+    if(inode==NULL)
+    {
+      free(file_name);
+      return false;
+    }
+
     dir_close(dir);
     dir = dir_open(inode);
     if(dir == NULL)
@@ -170,11 +168,13 @@ filesys_chdir (const char *name)
       free(file_name);
       return false;
     }
+
     dir_close(thread_current()->working_dir);
     thread_current()->working_dir = dir;
     free(file_name);
     return true;
   }
+
   free(file_name);
   return false;
 }
@@ -221,6 +221,7 @@ parse_dir(const char *name)
 
   char *cur_token, *save_ptr, *prev_token;
   struct dir *dir;
+  //absolute path
   if(path[0]=='/' || thread_current()->working_dir == NULL)
   {
     dir = dir_open_root();
@@ -241,13 +242,14 @@ parse_dir(const char *name)
     else if(strcmp(prev_token, "..") ==0)
     {
       inode = dir_parent_inode(dir);
-      if(inode == NULL) 
-        return NULL;
     }
     else if(dir_lookup(dir, prev_token, &inode) == false)
     {
       return NULL;
     }
+    if(inode == NULL) 
+        return NULL;
+
     if(inode->is_dir)
     {
       dir_close(dir);
